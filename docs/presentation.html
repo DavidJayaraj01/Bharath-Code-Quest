@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VitalBridge — Presentation Deck</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--navy:#0D1B2A;--teal:#0D9488;--teal-light:#14B8A6;--amber:#F59E0B;--coral:#EF4444;--slate50:#F8FAFC;--slate400:#94A3B8;--slate600:#475569}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--navy);color:#fff;overflow:hidden;height:100vh}
+.deck{display:flex;transition:transform 0.6s cubic-bezier(.4,0,.2,1);height:100vh}
+.slide{min-width:100vw;height:100vh;display:flex;flex-direction:column;justify-content:center;padding:60px 120px;position:relative;overflow:hidden}
+.slide::before{content:'';position:absolute;top:-200px;right:-200px;width:500px;height:500px;background:radial-gradient(circle,rgba(13,148,136,.15),transparent 70%);border-radius:50%}
+.slide-num{position:absolute;bottom:30px;right:40px;font-size:14px;color:var(--slate400);font-weight:600}
+h1{font-size:64px;font-weight:900;line-height:1.1;margin-bottom:20px}
+h2{font-size:42px;font-weight:800;margin-bottom:24px;line-height:1.2}
+h3{font-size:24px;font-weight:700;margin-bottom:16px;color:var(--teal-light)}
+p,.desc{font-size:20px;color:var(--slate400);line-height:1.7;max-width:800px}
+.accent{color:var(--teal-light)}
+.coral{color:var(--coral)}
+.amber{color:var(--amber)}
+.tag{display:inline-block;padding:6px 16px;border-radius:99px;font-size:13px;font-weight:700;margin:4px}
+.tag-teal{background:rgba(13,148,136,.2);color:var(--teal-light)}
+.tag-coral{background:rgba(239,68,68,.15);color:var(--coral)}
+.tag-amber{background:rgba(245,158,11,.15);color:var(--amber)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:32px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;margin-top:32px}
+.grid4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:20px;margin-top:32px}
+.card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:28px}
+.card h3{font-size:18px;margin-bottom:8px}
+.card p{font-size:15px;line-height:1.6}
+.stat{font-size:48px;font-weight:900;margin-bottom:4px}
+.stat-label{font-size:14px;color:var(--slate400);font-weight:500}
+.layer-num{font-size:13px;font-weight:800;color:var(--teal-light);margin-bottom:8px;letter-spacing:2px}
+.controls{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);display:flex;gap:12px;z-index:999}
+.controls button{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);color:#fff;padding:10px 20px;border-radius:12px;cursor:pointer;font-family:inherit;font-size:14px;font-weight:600;transition:all .2s}
+.controls button:hover{background:rgba(13,148,136,.3)}
+.logo-mark{width:48px;height:48px;background:var(--teal);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:900;margin-bottom:20px}
+table{width:100%;border-collapse:collapse;margin-top:20px;font-size:16px}
+th{text-align:left;padding:12px 16px;color:var(--teal-light);font-size:13px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid rgba(255,255,255,.1)}
+td{padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.05);color:var(--slate400)}
+td:first-child{color:#fff;font-weight:600}
+ul{list-style:none;margin-top:16px}
+ul li{padding:10px 0;font-size:18px;color:var(--slate400);border-bottom:1px solid rgba(255,255,255,.05);display:flex;align-items:flex-start;gap:12px}
+ul li::before{content:'→';color:var(--teal-light);font-weight:700;flex-shrink:0}
+.timeline{display:flex;gap:0;margin-top:32px}
+.tl-item{flex:1;padding:20px;border-top:3px solid var(--teal);position:relative}
+.tl-item::before{content:'';position:absolute;top:-7px;left:20px;width:10px;height:10px;background:var(--teal-light);border-radius:50%}
+.tl-month{font-size:13px;font-weight:700;color:var(--teal-light);margin-bottom:6px}
+.tl-desc{font-size:14px;color:var(--slate400);line-height:1.5}
+.hero-sub{font-size:22px;color:var(--slate400);margin-bottom:32px}
+.team-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:28px;margin-top:32px}
+.team-card{text-align:center;padding:32px;background:rgba(255,255,255,.04);border-radius:20px;border:1px solid rgba(255,255,255,.06)}
+.team-avatar{width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,var(--teal),#06B6D4);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800;margin:0 auto 16px}
+.team-name{font-size:18px;font-weight:700;margin-bottom:4px}
+.team-role{font-size:14px;color:var(--teal-light)}
+</style>
+</head>
+<body>
+
+<div class="deck" id="deck">
+
+<!-- Slide 1: Title -->
+<div class="slide">
+  <div class="logo-mark">V</div>
+  <h1>Vital<span class="accent">Bridge</span></h1>
+  <p class="hero-sub">AI-Powered Healthcare Continuum Platform for Bharat</p>
+  <div>
+    <span class="tag tag-teal">Bharat Academix CodeQuest 2026</span>
+    <span class="tag tag-teal">Team Cipher Strike</span>
+    <span class="tag tag-teal">Karunya Institute of Technology</span>
+  </div>
+  <div class="slide-num">1 / 12</div>
+</div>
+
+<!-- Slide 2: Problem -->
+<div class="slide">
+  <h3>THE CRISIS</h3>
+  <h2>India's <span class="coral">Three-Gap</span> Healthcare Emergency</h2>
+  <div class="grid3">
+    <div class="card">
+      <p class="stat coral">1:1,456</p>
+      <p class="stat-label">Doctor-to-Patient Ratio</p>
+      <p style="margin-top:12px;font-size:14px">WHO recommends 1:1,000. 65% of rural patients travel 30+ km for a single consultation.</p>
+    </div>
+    <div class="card">
+      <p class="stat amber">&lt;40%</p>
+      <p class="stat-label">Medication Adherence</p>
+      <p style="margin-top:12px;font-size:14px">Chronic diseases caught at Stage 3–4 when treatment is costly and outcomes are poor.</p>
+    </div>
+    <div class="card">
+      <p class="stat" style="color:var(--slate400)">Zero</p>
+      <p class="stat-label">Unified Health Records</p>
+      <p style="margin-top:12px;font-size:14px">Every hospital visit starts from zero — wasting time, money, and critical clinical context.</p>
+    </div>
+  </div>
+  <p style="margin-top:24px;font-size:16px;color:var(--coral)">600 million rural citizens affected. Most diseases diagnosed too late.</p>
+  <div class="slide-num">2 / 12</div>
+</div>
+
+<!-- Slide 3: Who We Serve -->
+<div class="slide">
+  <h3>STAKEHOLDERS</h3>
+  <h2>Who VitalBridge <span class="accent">Serves</span></h2>
+  <div class="grid4">
+    <div class="card"><h3>🏥 Rural Patients</h3><p>No nearby doctor, language barriers, no digital records</p></div>
+    <div class="card"><h3>👨‍⚕️ PHC Doctors</h3><p>Paper records, zero patient history, overwhelmed queues</p></div>
+    <div class="card"><h3>👩‍⚕️ ASHA Workers</h3><p>No digital tools, late outbreak alerts, manual tracking</p></div>
+    <div class="card"><h3>🏛️ District Officers</h3><p>2-week outbreak reporting lag, no real-time visibility</p></div>
+  </div>
+  <div class="slide-num">3 / 12</div>
+</div>
+
+<!-- Slide 4: Solution Overview -->
+<div class="slide">
+  <h3>THE SOLUTION</h3>
+  <h2>A <span class="accent">Closed-Loop</span> Healthcare Platform</h2>
+  <div class="grid2">
+    <div class="card">
+      <div class="layer-num">LAYER 1</div>
+      <h3>🤖 AI Symptom Triage</h3>
+      <p>WhatsApp-style chat in 5 Indian languages. AI assesses severity and escalates to doctors instantly.</p>
+    </div>
+    <div class="card">
+      <div class="layer-num">LAYER 2</div>
+      <h3>📋 Health Passport</h3>
+      <p>Lifelong patient-owned record: vitals, prescriptions, visit history. Doctors see full context instantly.</p>
+    </div>
+    <div class="card">
+      <div class="layer-num">LAYER 3</div>
+      <h3>🗺️ Disease Surveillance</h3>
+      <p>Real-time interactive outbreak map. Flags clusters 72 hours earlier than IDSP's 2-week lag.</p>
+    </div>
+    <div class="card">
+      <div class="layer-num">LAYER 4</div>
+      <h3>💊 Medication Adherence</h3>
+      <p>₹300 smart pill dispenser (ESP32). Missed doses trigger WhatsApp alerts to family & ASHA workers.</p>
+    </div>
+  </div>
+  <div class="slide-num">4 / 12</div>
+</div>
+
+<!-- Slide 5: Tech Stack -->
+<div class="slide">
+  <h3>TECHNOLOGY</h3>
+  <h2>Production-Grade <span class="accent">Architecture</span></h2>
+  <table>
+    <tr><th>Layer</th><th>Technology</th><th>Why</th></tr>
+    <tr><td>Frontend</td><td>React 19 + TypeScript + Vite + TailwindCSS</td><td>Fast, type-safe, modern</td></tr>
+    <tr><td>Maps</td><td>React-Leaflet + OpenStreetMap</td><td>Free, no API key, open-source</td></tr>
+    <tr><td>Backend</td><td>FastAPI (Python) + WebSockets</td><td>Async-native, auto-docs</td></tr>
+    <tr><td>AI Engine</td><td>Grok API (xAI) — provider-swappable</td><td>Abstracted via ai_service.py</td></tr>
+    <tr><td>Database</td><td>SQLite (dev) / PostgreSQL (prod)</td><td>Zero-config local, scalable prod</td></tr>
+    <tr><td>Auth</td><td>JWT + bcrypt + RBAC</td><td>Industry standard security</td></tr>
+    <tr><td>IoT</td><td>Software state machine (ESP32-compatible schema)</td><td>Plug in real hardware later</td></tr>
+    <tr><td>Deploy</td><td>Docker + docker-compose</td><td>One-command deployment</td></tr>
+  </table>
+  <div class="slide-num">5 / 12</div>
+</div>
+
+<!-- Slide 6: AI Triage -->
+<div class="slide">
+  <h3>LAYER 1 — DEEP DIVE</h3>
+  <h2>Multilingual <span class="accent">AI Triage</span></h2>
+  <div class="grid2">
+    <div>
+      <ul>
+        <li>Real-time streaming chat via WebSockets</li>
+        <li>5 languages: English, Hindi, Tamil, Telugu, Kannada, Bengali</li>
+        <li>Automatic severity: LOW → MEDIUM → HIGH</li>
+        <li>HIGH cases auto-escalate to doctor queue instantly</li>
+        <li>India-specific: dengue, malaria, typhoid, TB awareness</li>
+        <li>Vulnerable groups: children &lt;5, pregnant women, elderly 65+</li>
+      </ul>
+    </div>
+    <div class="card" style="display:flex;flex-direction:column;justify-content:center">
+      <p style="font-size:14px;color:var(--teal-light);margin-bottom:8px">Patient (Tamil)</p>
+      <p style="font-size:16px;background:rgba(13,148,136,.15);padding:12px 16px;border-radius:12px;margin-bottom:12px">"எனக்கு மூன்று நாட்களாக காய்ச்சல் இருக்கிறது"</p>
+      <p style="font-size:14px;color:var(--slate400);margin-bottom:8px">VitalBridge AI (responds in Tamil)</p>
+      <p style="font-size:16px;background:rgba(255,255,255,.05);padding:12px 16px;border-radius:12px">"உங்கள் அறிகுறிகளை புரிந்துகொள்கிறேன்... **தீவிரம்: நடுத்தரம்**"</p>
+    </div>
+  </div>
+  <div class="slide-num">6 / 12</div>
+</div>
+
+<!-- Slide 7: Surveillance -->
+<div class="slide">
+  <h3>LAYER 3 — DEEP DIVE</h3>
+  <h2>Real-Time <span class="accent">Outbreak Map</span></h2>
+  <div class="grid2">
+    <div>
+      <ul>
+        <li>Interactive Leaflet map with color-coded outbreak markers</li>
+        <li>Haversine distance clustering: 50 km radius, 48-hour window</li>
+        <li>5 symptom categories auto-classified from complaints</li>
+        <li>Alert levels: Normal → Watch → Warning → Critical</li>
+        <li>Live WebSocket updates when new triage data arrives</li>
+        <li>72-hour early warning vs. India's 2-week IDSP lag</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3 style="color:#fff">8 Cities Monitored</h3>
+      <p style="font-size:14px;line-height:2">Mumbai • Delhi • Bengaluru • Chennai<br>Kolkata • Hyderabad • Pune • Jaipur</p>
+      <div style="margin-top:16px;display:flex;gap:12px;flex-wrap:wrap">
+        <span class="tag tag-teal">Normal</span>
+        <span class="tag" style="background:rgba(59,130,246,.15);color:#3B82F6">Watch</span>
+        <span class="tag tag-amber">Warning</span>
+        <span class="tag tag-coral">Critical</span>
+      </div>
+    </div>
+  </div>
+  <div class="slide-num">7 / 12</div>
+</div>
+
+<!-- Slide 8: IoT -->
+<div class="slide">
+  <h3>LAYER 4 — DEEP DIVE</h3>
+  <h2>Smart Pill <span class="accent">Dispenser</span></h2>
+  <div class="grid2">
+    <div>
+      <ul>
+        <li>State machine: LOCKED → DOSE_WINDOW → DISPENSED/MISSED</li>
+        <li>Real-time WebSocket event streaming</li>
+        <li>Adherence rate calculation & tracking</li>
+        <li>Miss-dose alerts to ASHA workers & family</li>
+        <li>Manual demo controls for live presentations</li>
+        <li>ESP32-compatible schema — plug in real hardware with zero code changes</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3 style="color:#fff">Hardware-Ready Design</h3>
+      <p style="font-size:15px;line-height:1.8">The simulator produces the exact BLE GATT event format a physical ESP32 dispenser would emit. Swapping in real hardware requires changing only the event <em>source</em> — no architecture change needed.</p>
+      <p style="margin-top:16px;font-size:14px;color:var(--teal-light)">Target cost: ₹300 per unit</p>
+    </div>
+  </div>
+  <div class="slide-num">8 / 12</div>
+</div>
+
+<!-- Slide 9: Impact -->
+<div class="slide">
+  <h3>IMPACT</h3>
+  <h2>Projected <span class="accent">Outcomes</span></h2>
+  <div class="grid4">
+    <div class="card" style="text-align:center">
+      <p class="stat accent">10M+</p>
+      <p class="stat-label">Rural patients reached (Year 1)</p>
+    </div>
+    <div class="card" style="text-align:center">
+      <p class="stat amber">40%</p>
+      <p class="stat-label">Reduction in late-stage diagnosis</p>
+    </div>
+    <div class="card" style="text-align:center">
+      <p class="stat accent">3×</p>
+      <p class="stat-label">Medication adherence improvement</p>
+    </div>
+    <div class="card" style="text-align:center">
+      <p class="stat coral">72hr</p>
+      <p class="stat-label">Early outbreak warning</p>
+    </div>
+  </div>
+  <p style="margin-top:28px;text-align:center">Built for <span class="accent">ABDM</span>, <span class="accent">NDHA</span>, and <span class="accent">PM-JAY</span> compliance — 500M+ beneficiaries</p>
+  <div class="slide-num">9 / 12</div>
+</div>
+
+<!-- Slide 10: Roadmap -->
+<div class="slide">
+  <h3>EXECUTION</h3>
+  <h2>6-Month <span class="accent">Roadmap</span></h2>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-month">Month 1–2</div><div class="tl-desc">MVP: Triage bot + Health Passport backend + Web dashboard</div></div>
+    <div class="tl-item"><div class="tl-month">Month 3</div><div class="tl-desc">5-language expansion + ASHA surveillance dashboard</div></div>
+    <div class="tl-item"><div class="tl-month">Month 4</div><div class="tl-desc">IoT dispenser prototype + wearable integration</div></div>
+    <div class="tl-item"><div class="tl-month">Month 5</div><div class="tl-desc">Pilot: 2 PHCs, 500 patients (Tamil Nadu + UP)</div></div>
+    <div class="tl-item"><div class="tl-month">Month 6</div><div class="tl-desc">ABDM integration + scale to 5 districts, 10,000+ patients</div></div>
+  </div>
+  <div style="margin-top:32px">
+    <h3>Business Model</h3>
+    <div class="grid3" style="margin-top:12px">
+      <div class="card"><h3>B2G SaaS</h3><p>PHC subscriptions — ₹125 Cr ARR potential at scale</p></div>
+      <div class="card"><h3>Pharma Data</h3><p>Privacy-preserving adherence analytics partnerships</p></div>
+      <div class="card"><h3>IoT Hardware</h3><p>Dispenser units + subscription fees</p></div>
+    </div>
+  </div>
+  <div class="slide-num">10 / 12</div>
+</div>
+
+<!-- Slide 11: Team -->
+<div class="slide">
+  <h3>THE TEAM</h3>
+  <h2>Team <span class="accent">Cipher Strike</span></h2>
+  <div class="team-grid">
+    <div class="team-card">
+      <div class="team-avatar">D</div>
+      <p class="team-name">David Jayaraj A</p>
+      <p class="team-role">AI/ML Engineer</p>
+    </div>
+    <div class="team-card">
+      <div class="team-avatar">J</div>
+      <p class="team-name">Jerwin Titus D</p>
+      <p class="team-role">Full Stack Developer</p>
+    </div>
+    <div class="team-card">
+      <div class="team-avatar">D</div>
+      <p class="team-name">Daphne Christina Nelson</p>
+      <p class="team-role">IoT & Systems</p>
+    </div>
+  </div>
+  <p style="text-align:center;margin-top:28px;color:var(--slate400)">Karunya Institute of Technology and Sciences</p>
+  <div class="slide-num">11 / 12</div>
+</div>
+
+<!-- Slide 12: CTA -->
+<div class="slide" style="text-align:center">
+  <div class="logo-mark" style="margin:0 auto 20px">V</div>
+  <h1>Vital<span class="accent">Bridge</span></h1>
+  <p class="hero-sub">Bridging the healthcare gap, one patient at a time.</p>
+  <div style="margin-top:32px">
+    <span class="tag tag-teal" style="font-size:16px;padding:10px 24px">Live Demo Ready</span>
+  </div>
+  <p style="margin-top:40px;font-size:16px;color:var(--slate400)">Thank you — Team Cipher Strike</p>
+  <div class="slide-num">12 / 12</div>
+</div>
+
+</div>
+
+<!-- Navigation Controls -->
+<div class="controls">
+  <button onclick="prev()">← Previous</button>
+  <button onclick="next()">Next →</button>
+</div>
+
+<script>
+let current=0;const total=12;
+function go(n){current=Math.max(0,Math.min(total-1,n));document.getElementById('deck').style.transform=`translateX(-${current*100}vw)`}
+function next(){go(current+1)}
+function prev(){go(current-1)}
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key===' ')next();if(e.key==='ArrowLeft')prev()});
+</script>
+</body>
+</html>

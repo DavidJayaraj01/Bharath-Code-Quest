@@ -34,6 +34,41 @@ def new_uuid():
     return str(uuid.uuid4())
 
 
+import base64
+import hashlib
+from cryptography.fernet import Fernet
+from sqlalchemy.types import TypeDecorator, String as SAString
+
+class EncryptedString(TypeDecorator):
+    """SQLAlchemy custom type that transparently encrypts and decrypts values using AES-256 (Fernet)."""
+    impl = SAString
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from app.core.config import get_settings
+        settings = get_settings()
+        secret_bytes = settings.SECRET_KEY.encode()
+        derived_key = hashlib.sha256(secret_bytes).digest()
+        self.fernet = Fernet(base64.urlsafe_b64encode(derived_key))
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        # Encrypt the plaintext string
+        encrypted_bytes = self.fernet.encrypt(value.encode())
+        return encrypted_bytes.decode()
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        try:
+            # Decrypt the ciphertext string
+            decrypted_bytes = self.fernet.decrypt(value.encode())
+            return decrypted_bytes.decode()
+        except Exception:
+            # Fallback to plain value if not encrypted (e.g. legacy seed data)
+            return value
+
 # ── Users ────────────────────────────────────────────────────
 
 class User(Base):
@@ -62,8 +97,8 @@ class Patient(Base):
     user_id = Column(String, ForeignKey("users.id"), unique=True, nullable=False)
     date_of_birth = Column(DateTime, nullable=True)
     gender = Column(String, nullable=True)
-    phone = Column(String, nullable=True)
-    address = Column(Text, nullable=True)
+    phone = Column(EncryptedString, nullable=True)
+    address = Column(EncryptedString, nullable=True)
     city = Column(String, nullable=True)
     state = Column(String, nullable=True)
     pin_code = Column(String, nullable=True)
@@ -71,7 +106,7 @@ class Patient(Base):
     allergies = Column(JSON, default=list)  # list of strings
     chronic_conditions = Column(JSON, default=list)  # list of strings
     emergency_contact_name = Column(String, nullable=True)
-    emergency_contact_phone = Column(String, nullable=True)
+    emergency_contact_phone = Column(EncryptedString, nullable=True)
     created_at = Column(DateTime, default=utcnow)
 
     # Relationships

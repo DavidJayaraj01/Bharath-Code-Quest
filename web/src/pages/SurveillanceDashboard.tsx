@@ -2,14 +2,31 @@ import { useState, useEffect } from 'react';
 import api from '../api/client';
 import { useAuthStore } from '../store/authStore';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Activity, AlertTriangle, MapPin, TrendingUp, Loader2, Users, Pill, Clock } from 'lucide-react';
+import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import { Activity, AlertTriangle, MapPin, TrendingUp, Loader2, Users, Pill, Clock, Globe } from 'lucide-react';
 import type { SurveillanceSummary, SurveillanceRegionSummary, AdminDispenserDevice } from '../types';
 
-const alertColors: Record<string, { bg: string; text: string; dot: string }> = {
-  normal: { bg: 'bg-teal-50', text: 'text-teal-600', dot: 'bg-teal-400' },
-  watch: { bg: 'bg-blue-50', text: 'text-blue-600', dot: 'bg-blue-400' },
-  warning: { bg: 'bg-amber-50', text: 'text-amber-600', dot: 'bg-amber-400' },
-  critical: { bg: 'bg-coral-500/10', text: 'text-coral-500', dot: 'bg-coral-500' },
+function MapResizeInvalidator() {
+  const map = useMap();
+  useEffect(() => {
+    const handleResize = () => {
+      setTimeout(() => {
+        map.invalidateSize();
+      }, 200);
+    };
+    window.addEventListener('resize', handleResize);
+    handleResize();
+    return () => window.removeEventListener('resize', handleResize);
+  }, [map]);
+  return null;
+}
+
+const alertColors: Record<string, { bg: string; text: string; dot: string; mapColor: string }> = {
+  normal: { bg: 'bg-teal-50', text: 'text-teal-600', dot: 'bg-teal-400', mapColor: '#14B8A6' },
+  watch: { bg: 'bg-blue-50', text: 'text-blue-600', dot: 'bg-blue-400', mapColor: '#3B82F6' },
+  warning: { bg: 'bg-amber-50', text: 'text-amber-600', dot: 'bg-amber-400', mapColor: '#F59E0B' },
+  critical: { bg: 'bg-coral-500/10', text: 'text-coral-500', dot: 'bg-coral-500', mapColor: '#EF4444' },
 };
 
 const dispenserStateColors: Record<string, { bg: string; text: string; label: string }> = {
@@ -34,7 +51,7 @@ export default function SurveillanceDashboard() {
   const [activeTab, setActiveTab] = useState<'outbreak' | 'adherence'>('outbreak');
   const [summary, setSummary] = useState<SurveillanceSummary | null>(null);
   const [selectedRegion, setSelectedRegion] = useState<SurveillanceRegionSummary | null>(null);
-  
+
   // IoT Adherence States
   const [devices, setDevices] = useState<AdminDispenserDevice[]>([]);
   const [liveLogs, setLiveLogs] = useState<LiveEventLog[]>([]);
@@ -65,25 +82,22 @@ export default function SurveillanceDashboard() {
   useEffect(() => {
     if (!token) return;
     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const ws = new WebSocket(`${protocol}://${window.location.host}/api/surveillance/ws?token=${token}`);
-    
+    const host = window.location.hostname === 'localhost' ? 'localhost:8000' : window.location.host;
+    const ws = new WebSocket(`${protocol}://${host}/api/surveillance/ws?token=${token}`);
+
     ws.onmessage = (e) => {
       const data = JSON.parse(e.data);
       if (data.type === 'surveillance_update') {
         api.get('/surveillance/summary').then(r => setSummary(r.data));
       } else if (data.type === 'dispenser_state_change') {
-        // Find corresponding device and update it
         setDevices(prev => prev.map(d => {
           if (d.device_id === data.device_id) {
-            // Update device in list
             const updated = {
               ...d,
               state: data.to_state,
               adherence_rate: data.adherence_rate,
               last_event_time: data.last_event_time
             };
-
-            // Add live log entry
             const logEntry: LiveEventLog = {
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
               patientName: d.patient_name,
@@ -114,6 +128,9 @@ export default function SurveillanceDashboard() {
     });
   });
   const pieData = Object.entries(categoryTotals).map(([name, value]) => ({ name, value }));
+
+  // Map center: approximate center of India
+  const mapCenter: [number, number] = [22.5, 78.5];
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6 animate-fade-in">
@@ -162,6 +179,67 @@ export default function SurveillanceDashboard() {
                 <p className="text-xs text-slate-400 mt-0.5">{stat.label}</p>
               </div>
             ))}
+          </div>
+
+          {/* ── Interactive Outbreak Map ── */}
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+              <Globe size={16} className="text-teal-500" />
+              Live Outbreak Map — India
+            </h3>
+            <div className="rounded-xl overflow-hidden border border-slate-200 h-[40vh] md:h-[420px]">
+              <MapContainer
+                center={mapCenter}
+                zoom={5}
+                style={{ height: '100%', width: '100%' }}
+                scrollWheelZoom={true}
+              >
+                <MapResizeInvalidator />
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+                {summary?.regions.map(region => {
+                  const alert = alertColors[region.alert_level] || alertColors.normal;
+                  const radius = Math.max(8, Math.min(30, region.total_cases / 3));
+                  return (
+                    <CircleMarker
+                      key={region.region}
+                      center={[region.latitude, region.longitude]}
+                      radius={radius}
+                      pathOptions={{
+                        color: alert.mapColor,
+                        fillColor: alert.mapColor,
+                        fillOpacity: 0.4,
+                        weight: 2,
+                      }}
+                      eventHandlers={{ click: () => setSelectedRegion(region) }}
+                    >
+                      <Popup>
+                        <div className="text-xs font-sans">
+                          <p className="font-bold text-sm mb-1">{region.region}</p>
+                          <p>Alert: <span className="font-semibold uppercase">{region.alert_level}</span></p>
+                          <p>Cases: <span className="font-semibold">{region.total_cases}</span></p>
+                          <p>Risk Score: <span className="font-semibold">{Math.round(region.max_risk_score * 100)}%</span></p>
+                          <div className="mt-1 pt-1 border-t border-slate-200">
+                            {Object.entries(region.categories).map(([cat, count]) => (
+                              <p key={cat} className="capitalize">{cat}: {count}</p>
+                            ))}
+                          </div>
+                        </div>
+                      </Popup>
+                    </CircleMarker>
+                  );
+                })}
+              </MapContainer>
+            </div>
+            <div className="flex items-center gap-6 mt-3 text-xs text-slate-400">
+              <span className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-teal-400" /> Normal</span>
+              <span className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-blue-400" /> Watch</span>
+              <span className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-amber-400" /> Warning</span>
+              <span className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-coral-500" /> Critical</span>
+              <span className="ml-auto">Circle size = case volume</span>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -359,7 +437,7 @@ export default function SurveillanceDashboard() {
               <Clock size={16} className="text-teal-500" />
               Live Simulator Log
             </h3>
-            
+
             <div className="flex-1 overflow-auto space-y-3 pr-1">
               {liveLogs.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-slate-300 text-center px-4">

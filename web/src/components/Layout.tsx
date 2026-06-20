@@ -31,9 +31,9 @@ export default function Layout() {
   const items = navItems[user?.role || 'patient'] || [];
 
   return (
-    <div className="flex h-screen bg-slate-50">
-      {/* Sidebar */}
-      <aside className="w-64 bg-navy-900 text-white flex flex-col shrink-0">
+    <div className="flex h-screen bg-slate-50 flex-col lg:flex-row">
+      {/* Sidebar - Desktop */}
+      <aside className="hidden lg:flex w-64 bg-navy-900 text-white flex-col shrink-0">
         {/* Logo */}
         <div className="px-6 py-5 border-b border-white/10">
           <div className="flex items-center gap-3">
@@ -88,8 +88,34 @@ export default function Layout() {
         </div>
       </aside>
 
+      {/* Mobile Bottom Tab Bar */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-slate-200 flex items-center justify-around z-50 px-4 pb-[env(safe-area-inset-bottom)] shadow-lg">
+        {items.map((item) => (
+          <NavLink
+            key={item.path}
+            to={item.path}
+            className={({ isActive }) =>
+              `flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition-all duration-200
+              ${isActive ? 'text-teal-500' : 'text-slate-400 hover:text-slate-600'}`
+            }
+          >
+            {item.icon}
+            <span>{item.label}</span>
+          </NavLink>
+        ))}
+        {/* Mobile logout */}
+        <button
+          onClick={handleLogout}
+          className="flex flex-col items-center justify-center gap-1 text-[10px] font-medium text-slate-400 hover:text-slate-600"
+          title="Logout"
+        >
+          <LogOut size={20} />
+          <span>Logout</span>
+        </button>
+      </nav>
+
       {/* Main content */}
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto pb-20 lg:pb-0">
         <Outlet />
       </main>
     </div>

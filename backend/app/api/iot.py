@@ -100,6 +100,195 @@ def get_device_events(
     )
 
 
+@router.post("/devices/{device_id}/take-dose")
+async def manual_take_dose(
+    device_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Manually trigger a dose-taken event (for demo/hackathon presentations)."""
+    device = db.query(DispenserDevice).filter(DispenserDevice.id == device_id).first()
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+
+    from datetime import datetime, timezone
+
+    # Record dose_taken event
+    event = DispenserEvent(
+        device_id=device.id,
+        event_type="dose_taken",
+        from_state=device.state,
+        to_state="dispensed",
+        payload={
+            "medication": device.medication_name,
+            "dosage": device.dosage,
+            "trigger": "manual",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        },
+    )
+    device.state = "dispensed"
+    db.add(event)
+    db.commit()
+
+    # Broadcast to WebSocket
+    await manager.broadcast(f"iot:{device.id}", {
+        "type": "dispenser_event",
+        "event": {
+            "id": event.id,
+            "device_id": event.device_id,
+            "event_type": "dose_taken",
+            "from_state": event.from_state,
+            "to_state": "dispensed",
+            "payload": event.payload,
+            "created_at": event.created_at.isoformat(),
+        },
+    })
+
+    # Calculate adherence
+    events_list = db.query(DispenserEvent).filter(DispenserEvent.device_id == device.id).all()
+    taken = sum(1 for e in events_list if e.event_type == "dose_taken")
+    missed = sum(1 for e in events_list if e.event_type == "dose_missed" or e.to_state == "missed")
+    total = taken + missed
+    rate = round((taken / total) * 100, 1) if total > 0 else 100.0
+
+    await manager.broadcast("surveillance", {
+        "type": "dispenser_state_change",
+        "device_id": device.id,
+        "to_state": "dispensed",
+        "adherence_rate": rate,
+        "last_event_time": event.created_at.isoformat(),
+    })
+
+    return {"status": "ok", "event_type": "dose_taken", "adherence_rate": rate}
+
+
+@router.post("/devices/{device_id}/miss-dose")
+async def manual_miss_dose(
+    device_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Manually trigger a dose-missed event (for demo/hackathon presentations)."""
+    device = db.query(DispenserDevice).filter(DispenserDevice.id == device_id).first()
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+
+    from datetime import datetime, timezone
+
+    event = DispenserEvent(
+        device_id=device.id,
+        event_type="dose_missed",
+        from_state=device.state,
+        to_state="missed",
+        payload={
+            "medication": device.medication_name,
+            "dosage": device.dosage,
+            "trigger": "manual",
+            "alert_type": "missed_dose",
+            "message": f"Missed dose of {device.medication_name} ({device.dosage})",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        },
+    )
+    device.state = "missed"
+    db.add(event)
+    db.commit()
+
+    await manager.broadcast(f"iot:{device.id}", {
+        "type": "dispenser_event",
+        "event": {
+            "id": event.id,
+            "device_id": event.device_id,
+            "event_type": "dose_missed",
+            "from_state": event.from_state,
+            "to_state": "missed",
+            "payload": event.payload,
+            "created_at": event.created_at.isoformat(),
+        },
+    })
+
+    await manager.broadcast(f"iot:{device.id}", {
+        "type": "missed_dose_alert",
+        "device_id": device.id,
+        "medication": device.medication_name,
+        "dosage": device.dosage,
+    })
+
+    # Send real WhatsApp notification
+    try:
+        from app.services.communication import send_twilio_message
+        patient = db.query(Patient).filter(Patient.id == device.patient_id).first()
+        p_user = db.query(User).filter(User.id == patient.user_id).first() if patient else None
+        if patient and patient.phone:
+            name = p_user.full_name if p_user else "Patient"
+            msg_body = (
+                f"VITALBRIDGE ALERT: {name} has missed their scheduled dose of {device.medication_name} ({device.dosage}). "
+                f"Please check in on them."
+            )
+            send_twilio_message(to_phone=patient.phone, body=msg_body, is_whatsapp=True)
+    except Exception as e:
+        print(f"[Twilio Missed Dose Notification Error] {e}")
+
+    events_list = db.query(DispenserEvent).filter(DispenserEvent.device_id == device.id).all()
+    taken = sum(1 for e in events_list if e.event_type == "dose_taken")
+    missed_count = sum(1 for e in events_list if e.event_type == "dose_missed" or e.to_state == "missed")
+    total = taken + missed_count
+    rate = round((taken / total) * 100, 1) if total > 0 else 100.0
+
+    await manager.broadcast("surveillance", {
+        "type": "dispenser_state_change",
+        "device_id": device.id,
+        "to_state": "missed",
+        "adherence_rate": rate,
+        "last_event_time": event.created_at.isoformat(),
+    })
+
+    return {"status": "ok", "event_type": "dose_missed", "adherence_rate": rate}
+
+
+@router.post("/devices/{device_id}/reset")
+async def manual_reset_device(
+    device_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Reset the dispenser to locked state (for demo resets)."""
+    device = db.query(DispenserDevice).filter(DispenserDevice.id == device_id).first()
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+
+    from datetime import datetime, timezone
+
+    event = DispenserEvent(
+        device_id=device.id,
+        event_type="state_change",
+        from_state=device.state,
+        to_state="locked",
+        payload={
+            "medication": device.medication_name,
+            "trigger": "manual_reset",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        },
+    )
+    device.state = "locked"
+    db.add(event)
+    db.commit()
+
+    await manager.broadcast(f"iot:{device.id}", {
+        "type": "dispenser_event",
+        "event": {
+            "id": event.id,
+            "device_id": event.device_id,
+            "event_type": "state_change",
+            "from_state": event.from_state,
+            "to_state": "locked",
+            "payload": event.payload,
+            "created_at": event.created_at.isoformat(),
+        },
+    })
+
+    return {"status": "ok", "state": "locked"}
+
+
 @router.websocket("/ws/{device_id}")
 async def iot_ws(websocket: WebSocket, device_id: str):
     """WebSocket for live dispenser event streaming."""
@@ -119,3 +308,4 @@ async def iot_ws(websocket: WebSocket, device_id: str):
             await websocket.receive_text()
     except WebSocketDisconnect:
         await manager.disconnect(websocket, f"iot:{device_id}")
+

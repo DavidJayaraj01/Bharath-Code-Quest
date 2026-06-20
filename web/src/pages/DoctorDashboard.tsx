@@ -30,7 +30,8 @@ export default function DoctorDashboard() {
   useEffect(() => {
     if (!token) return;
     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const ws = new WebSocket(`${protocol}://${window.location.host}/api/doctor/ws/queue?token=${token}`);
+    const host = window.location.hostname === 'localhost' ? 'localhost:8000' : window.location.host;
+    const ws = new WebSocket(`${protocol}://${host}/api/doctor/ws/queue?token=${token}`);
     ws.onmessage = (e) => {
       const data = JSON.parse(e.data);
       if (data.type === 'new_escalation') {

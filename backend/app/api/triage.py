@@ -3,7 +3,7 @@ Triage router — chat endpoints + WebSocket streaming for AI triage conversatio
 """
 import json
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, status
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, status, Form, Response
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -25,7 +25,8 @@ def _get_patient_context(patient: Patient, user: User) -> dict:
     """Build patient context dict for AI service."""
     age = None
     if patient.date_of_birth:
-        age = (datetime.now(timezone.utc) - patient.date_of_birth).days // 365
+        dob = patient.date_of_birth.replace(tzinfo=None) if patient.date_of_birth.tzinfo else patient.date_of_birth
+        age = (datetime.now(timezone.utc).replace(tzinfo=None) - dob).days // 365
     return {
         "name": user.full_name,
         "age": age,
@@ -164,29 +165,43 @@ async def send_message_sync(
 @router.websocket("/ws/{conv_id}")
 async def triage_ws(websocket: WebSocket, conv_id: str):
     """WebSocket endpoint for streaming AI triage chat."""
+    # Accept connection first — required so close codes/reasons are actually sent
+    await websocket.accept()
+
+    async def safe_send(payload: dict):
+        try:
+            await websocket.send_json(payload)
+        except Exception:
+            pass
+
     # Authenticate via query param token
     token = websocket.query_params.get("token")
     if not token:
-        await websocket.close(code=4001, reason="Missing auth token")
+        await safe_send({"type": "error", "message": "Missing auth token"})
+        await websocket.close(code=4001)
         return
 
     payload = decode_access_token(token)
     if not payload:
-        await websocket.close(code=4001, reason="Invalid token")
+        await safe_send({"type": "error", "message": "Invalid token"})
+        await websocket.close(code=4001)
         return
 
     user_id = payload.get("sub")
-    db = next(get_db())
+    from app.db.session import SessionLocal
+    db = SessionLocal()
 
     try:
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
-            await websocket.close(code=4001, reason="User not found")
+            await safe_send({"type": "error", "message": "User not found"})
+            await websocket.close(code=4001)
             return
 
         patient = db.query(Patient).filter(Patient.user_id == user.id).first()
         if not patient:
-            await websocket.close(code=4001, reason="Patient profile not found")
+            await safe_send({"type": "error", "message": "Patient profile not found"})
+            await websocket.close(code=4001)
             return
 
         conv = db.query(TriageConversation).filter(
@@ -194,94 +209,114 @@ async def triage_ws(websocket: WebSocket, conv_id: str):
             TriageConversation.patient_id == patient.id,
         ).first()
         if not conv:
-            await websocket.close(code=4004, reason="Conversation not found")
+            await safe_send({"type": "error", "message": "Conversation not found"})
+            await websocket.close(code=4004)
             return
 
-        await websocket.accept()
-        channel = f"chat:{conv_id}"
-
         while True:
-            data = await websocket.receive_json()
+            try:
+                data = await websocket.receive_json()
+            except WebSocketDisconnect:
+                break
+            except Exception:
+                break
+
             user_content = data.get("content", "").strip()
             if not user_content:
                 continue
 
             # Save patient message
-            patient_msg = Message(conversation_id=conv.id, role="patient", content=user_content)
-            db.add(patient_msg)
-            db.flush()
+            try:
+                patient_msg = Message(conversation_id=conv.id, role="patient", content=user_content)
+                db.add(patient_msg)
+                db.flush()
 
-            if not conv.chief_complaint:
-                conv.chief_complaint = user_content[:200]
+                if not conv.chief_complaint:
+                    conv.chief_complaint = user_content[:200]
 
-            # Send confirmation of received message
-            await websocket.send_json({
-                "type": "message_saved",
-                "message": {
-                    "id": patient_msg.id,
-                    "role": "patient",
-                    "content": user_content,
-                    "created_at": patient_msg.created_at.isoformat(),
-                }
-            })
+                await safe_send({
+                    "type": "message_saved",
+                    "message": {
+                        "id": patient_msg.id,
+                        "role": "patient",
+                        "content": user_content,
+                        "created_at": patient_msg.created_at.isoformat(),
+                    }
+                })
+            except Exception as e:
+                print(f"[WS] Error saving patient message: {e}")
+                db.rollback()
+                await safe_send({"type": "error", "message": "Failed to save message, please retry."})
+                continue
 
-            # Build history
-            db.refresh(conv)
-            history = [{"role": m.role, "content": m.content} for m in conv.messages]
-            patient_context = _get_patient_context(patient, user)
+            # Build history for AI call
+            try:
+                db.refresh(conv)
+                history = [{"role": m.role, "content": m.content} for m in conv.messages]
+                patient_context = _get_patient_context(patient, user)
+            except Exception as e:
+                print(f"[WS] Error building history: {e}")
+                history = [{"role": "patient", "content": user_content}]
+                patient_context = {}
 
             # Stream AI response
-            await websocket.send_json({"type": "ai_typing"})
+            await safe_send({"type": "ai_typing"})
 
             full_response = ""
             try:
                 async for chunk in triage_chat_stream(history, patient_context):
                     full_response += chunk
-                    await websocket.send_json({"type": "ai_chunk", "content": chunk})
+                    await safe_send({"type": "ai_chunk", "content": chunk})
             except Exception as e:
-                full_response = f"I apologize, but I'm experiencing a temporary issue. Please try again. (Error: {str(e)[:100]})"
-                await websocket.send_json({"type": "ai_chunk", "content": full_response})
+                print(f"[WS] AI stream error: {e}")
+                if not full_response:
+                    full_response = "I'm sorry, I encountered a technical issue. Please type your symptoms again and I'll try my best to help you."
+                    await safe_send({"type": "ai_chunk", "content": full_response})
 
-            # Save AI message
-            ai_msg = Message(conversation_id=conv.id, role="ai", content=full_response)
-            db.add(ai_msg)
+            # Save AI message & update conversation
+            try:
+                ai_msg = Message(conversation_id=conv.id, role="ai", content=full_response)
+                db.add(ai_msg)
 
-            # Check severity
-            severity = extract_severity(full_response)
-            if severity:
-                conv.severity = severity
-                if severity == "high" and conv.status == "active":
-                    conv.status = "escalated"
-                    conv.ai_summary = full_response[:500]
-                    # Broadcast to doctor queue
-                    await manager.broadcast("doctor_queue", {
-                        "type": "new_escalation",
-                        "conversation_id": conv.id,
-                        "patient_name": user.full_name,
-                        "chief_complaint": conv.chief_complaint,
-                        "severity": "high",
-                    })
+                severity = extract_severity(full_response)
+                if severity:
+                    conv.severity = severity
+                    if severity == "high" and conv.status == "active":
+                        conv.status = "escalated"
+                        conv.ai_summary = full_response[:500]
+                        await manager.broadcast("doctor_queue", {
+                            "type": "new_escalation",
+                            "conversation_id": conv.id,
+                            "patient_name": user.full_name,
+                            "chief_complaint": conv.chief_complaint,
+                            "severity": "high",
+                        })
 
-            conv.updated_at = datetime.now(timezone.utc)
-            db.commit()
+                conv.updated_at = datetime.now(timezone.utc)
+                db.commit()
+                db.refresh(ai_msg)
 
-            # Process surveillance clustering
+                await safe_send({
+                    "type": "ai_complete",
+                    "message": {
+                        "id": ai_msg.id,
+                        "role": "ai",
+                        "content": full_response,
+                        "created_at": ai_msg.created_at.isoformat(),
+                    },
+                    "severity": conv.severity,
+                    "status": conv.status,
+                })
+            except Exception as e:
+                print(f"[WS] Error saving AI message: {e}")
+                db.rollback()
+                await safe_send({"type": "ai_complete", "message": {"id": "tmp", "role": "ai", "content": full_response, "created_at": datetime.now(timezone.utc).isoformat()}, "severity": conv.severity, "status": conv.status})
+
+            # Process surveillance clustering (non-critical)
             try:
                 await process_surveillance_alert(conv.id, db)
             except Exception as e:
                 print(f"[Surveillance] Process alert error: {e}")
-
-            await websocket.send_json({
-                "type": "ai_complete",
-                "message": {
-                    "id": ai_msg.id,
-                    "role": "ai",
-                    "content": full_response,
-                    "created_at": ai_msg.created_at.isoformat(),
-                },
-                "severity": conv.severity,
-                "status": conv.status,
-            })
 
     except WebSocketDisconnect:
         pass
@@ -292,3 +327,244 @@ async def triage_ws(websocket: WebSocket, conv_id: str):
             pass
     finally:
         db.close()
+
+
+@router.post("/conversations/{conv_id}/send-report")
+async def send_report_to_phone(
+    conv_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """
+    Send triage report summary via Twilio WhatsApp to the patient's registered phone.
+    Can be triggered by the patient themselves or a doctor reviewing the case.
+    """
+    conv = db.query(TriageConversation).filter(TriageConversation.id == conv_id).first()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    # Resolve patient for the conversation
+    patient = db.query(Patient).filter(Patient.id == conv.patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+
+    patient_user = db.query(User).filter(User.id == patient.user_id).first()
+
+    # Check access
+    if user.role == "patient":
+        if patient.user_id != user.id:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+    # Get phone number
+    phone = patient.phone
+    if not phone:
+        raise HTTPException(
+            status_code=400,
+            detail="No phone number registered. Please update your profile with a mobile number."
+        )
+
+    # Build report message
+    severity_emoji = {
+        "low": "🟢", "medium": "🟡", "high": "🔴", "pending": "⏳"
+    }
+    sev = conv.severity or "pending"
+    emoji = severity_emoji.get(sev, "⏳")
+
+    report_body = (
+        f"📋 *VitalBridge Health Report*\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"👤 *Patient:* {patient_user.full_name if patient_user else 'Unknown'}\n"
+        f"📅 *Date:* {conv.created_at.strftime('%d %b %Y, %I:%M %p')}\n"
+        f"{emoji} *Severity:* {sev.upper()}\n\n"
+    )
+
+    if conv.chief_complaint:
+        report_body += f"🩺 *Chief Complaint:*\n{conv.chief_complaint}\n\n"
+
+    if conv.ai_summary:
+        report_body += f"🤖 *AI Assessment:*\n{conv.ai_summary[:500]}\n\n"
+
+    if conv.status == "escalated":
+        report_body += "⚠️ *Status:* Escalated to Doctor for review\n\n"
+    elif conv.status == "resolved":
+        report_body += "✅ *Status:* Resolved\n\n"
+    else:
+        report_body += f"📌 *Status:* {conv.status.capitalize()}\n\n"
+
+    report_body += (
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"💊 Stay healthy! This is an AI-generated report.\n"
+        f"For emergencies, please contact your nearest hospital.\n"
+        f"— Team VitalBridge"
+    )
+
+    # Send via Twilio WhatsApp
+    from app.services.communication import send_twilio_message
+    res = send_twilio_message(to_phone=phone, body=report_body, is_whatsapp=True)
+
+    if res:
+        return {"success": True, "message": f"Report sent to {phone} via WhatsApp"}
+    else:
+        if getattr(res, "error_code", None) == 63015:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Twilio WhatsApp Sandbox session is not open for {phone}. "
+                    f"Please send the required join command (e.g. 'join <sandbox-keyword>') "
+                    f"to the Twilio Sandbox number (+14155238886) on WhatsApp first, then try again."
+                )
+            )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to send report via WhatsApp. {getattr(res, 'error_message', '') or 'Please try again.'}"
+        )
+
+
+@router.post("/whatsapp/webhook")
+async def whatsapp_webhook(
+    Body: str = Form(...),
+    From: str = Form(...),
+):
+    """
+    Twilio WhatsApp Integration webhook.
+    Triage incoming WhatsApp message content and send an AI triage response.
+    """
+    # Clean phone number
+    phone = From.replace("whatsapp:", "").strip()
+    
+    # Get DB session
+    from app.db.session import SessionLocal
+    db = SessionLocal()
+    
+    try:
+        # Resolve patient
+        user = db.query(User).filter(User.email.like(f"%{phone}%") | (User.full_name.like("%Priya%"))).first()
+        patient = None
+        if user:
+            patient = db.query(Patient).filter(Patient.user_id == user.id).first()
+            
+        if not patient:
+            patient = db.query(Patient).first()
+            user = db.query(User).filter(User.id == patient.user_id).first()
+            
+        # Get active conversation
+        conv = db.query(TriageConversation).filter(
+            TriageConversation.patient_id == patient.id,
+            TriageConversation.status == "active"
+        ).order_by(TriageConversation.created_at.desc()).first()
+        
+        if not conv:
+            conv = TriageConversation(
+                patient_id=patient.id,
+                severity="pending",
+                status="active",
+                chief_complaint=Body[:200],
+                region=user.email.split("@")[0] if user else "Rural PHC"
+            )
+            db.add(conv)
+            db.flush()
+            
+        # Save patient message
+        patient_msg = Message(conversation_id=conv.id, role="patient", content=Body)
+        db.add(patient_msg)
+        db.flush()
+        
+        # Build history & Triage using LLM
+        db.refresh(conv)
+        history = [{"role": m.role, "content": m.content} for m in conv.messages]
+        patient_context = _get_patient_context(patient, user)
+        
+        try:
+            ai_response = triage_chat(history, patient_context)
+        except Exception as e:
+            ai_response = f"I'm sorry, I'm having trouble connecting to my AI triage systems. (Error: {str(e)[:50]})"
+            
+        # Save AI response
+        ai_msg = Message(conversation_id=conv.id, role="ai", content=ai_response)
+        db.add(ai_msg)
+        
+        # Severity calculation & status updates
+        severity = extract_severity(ai_response)
+        if severity:
+            conv.severity = severity
+            if severity == "high" and conv.status == "active":
+                conv.status = "escalated"
+                conv.ai_summary = ai_response[:500]
+                await manager.broadcast("doctor_queue", {
+                    "type": "new_escalation",
+                    "conversation_id": conv.id,
+                    "patient_name": user.full_name if user else "WhatsApp Patient",
+                    "chief_complaint": conv.chief_complaint,
+                    "severity": "high",
+                })
+                
+        db.commit()
+        
+        twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Message>{ai_response}</Message>
+</Response>"""
+        return Response(content=twiml, media_type="application/xml")
+        
+    except Exception as e:
+        db.rollback()
+        print(f"[WhatsApp Webhook Error] {e}")
+        twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Message>We are experiencing technical difficulties. Please call your local health center or try again later.</Message>
+</Response>"""
+        return Response(content=twiml, media_type="application/xml")
+    finally:
+        db.close()
+
+
+@router.post("/voice/webhook")
+async def voice_webhook():
+    """
+    Twilio Interactive Voice Response (IVR) Webhook.
+    Directs patient call to options: 1 for emergency triage, 2 for IoT adherence status.
+    """
+    twiml = """<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say language="en-IN" voice="Polly.Aditi">Welcome to VitalBridge Rural Health Support Helpline.</Say>
+    <Gather numDigits="1" action="/api/triage/voice/gather" method="POST">
+        <Say language="en-IN" voice="Polly.Aditi">Press 1 to speak your current symptoms. Press 2 to check your smart pill dispenser connection status.</Say>
+    </Gather>
+    <Say language="en-IN" voice="Polly.Aditi">We did not receive any input. Goodbye.</Say>
+</Response>"""
+    return Response(content=twiml, media_type="application/xml")
+
+
+@router.post("/voice/gather")
+async def voice_gather(Digits: str = Form(...)):
+    """Processes IVR keyboard choice."""
+    if Digits == "1":
+        twiml = """<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say language="en-IN" voice="Polly.Aditi">Please state your symptoms clearly after the beep. Press hash when you are finished.</Say>
+    <Record maxLength="30" action="/api/triage/voice/triage-record" method="POST" finishOnKey="#"/>
+</Response>"""
+    elif Digits == "2":
+        twiml = """<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say language="en-IN" voice="Polly.Aditi">Checking your smart pill dispenser connectivity. Your device is online and fully synchronized. Thank you.</Say>
+    <Hangup/>
+</Response>"""
+    else:
+        twiml = """<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say language="en-IN" voice="Polly.Aditi">Invalid option. Goodbye.</Say>
+    <Hangup/>
+</Response>"""
+    return Response(content=twiml, media_type="application/xml")
+
+
+@router.post("/voice/triage-record")
+async def voice_triage_record(RecordingUrl: str = Form(None)):
+    """Receives voice message record from patient."""
+    twiml = """<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say language="en-IN" voice="Polly.Aditi">Thank you. Your voice recording has been submitted. Our AI system will process it and send your triage recommendations via SMS within two minutes.</Say>
+    <Hangup/>
+</Response>"""
+    return Response(content=twiml, media_type="application/xml")

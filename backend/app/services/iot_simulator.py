@@ -127,6 +127,22 @@ class DispenserSimulator:
                 "dosage": device.dosage,
             })
 
+            # Send real WhatsApp notification
+            try:
+                from app.models.models import Patient, User
+                from app.services.communication import send_twilio_message
+                patient = db.query(Patient).filter(Patient.id == device.patient_id).first()
+                p_user = db.query(User).filter(User.id == patient.user_id).first() if patient else None
+                if patient and patient.phone:
+                    name = p_user.full_name if p_user else "Patient"
+                    msg_body = (
+                        f"VITALBRIDGE ALERT: {name} has missed their scheduled dose of {device.medication_name} ({device.dosage}). "
+                        f"Please check in on them."
+                    )
+                    send_twilio_message(to_phone=patient.phone, body=msg_body, is_whatsapp=True)
+            except Exception as e:
+                print(f"[Twilio Missed Dose Notification Error] {e}")
+
     async def _run_loop(self):
         """Main simulation loop with compressed time."""
         import random

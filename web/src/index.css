@@ -1,27 +1,48 @@
 @import "tailwindcss";
 
 @theme {
-  --color-navy-900: #0D1B2A;
-  --color-navy-800: #1B2838;
-  --color-navy-700: #263545;
-  --color-navy-600: #344955;
-  --color-teal-500: #0D9488;
-  --color-teal-400: #14B8A6;
-  --color-teal-300: #5EEAD4;
-  --color-mint-100: #CCFBF1;
-  --color-mint-50: #F0FDFA;
-  --color-amber-500: #F59E0B;
-  --color-amber-400: #FBBF24;
+  /* Peach Ramp */
+  --color-peach-50: hsl(33 100% 97%);     /* #FFF8F2 */
+  --color-peach-100: hsl(28 100% 90%);    /* #FFE8D6 */
+  --color-peach-200: hsl(26 100% 82%);    /* #FFD4AD */
+  --color-peach-300: hsl(24 100% 70%);    /* #FFB87A */
+  --color-peach-500: hsl(24 79% 60%);     /* #E87F33 */
+  --color-peach-600: hsl(22 70% 50%);     /* #C2641F */
+  --color-peach-700: hsl(22 65% 38%);     /* #8A4B1F */
+  --color-peach-900: hsl(20 55% 16%);     /* #3D2310 */
+
+  /* Sage Green Ramp */
+  --color-sage-50: hsl(96 45% 95%);       /* #F4FAF0 */
+  --color-sage-100: hsl(96 40% 88%);      /* #E8F5E0 */
+  --color-sage-200: hsl(95 42% 78%);      /* #C5E8B0 */
+  --color-sage-300: hsl(96 40% 64%);      /* #9AD17F */
+  --color-sage-500: hsl(100 47% 41%);     /* #3E7A2C */
+  --color-sage-600: hsl(102 53% 33%);     /* #2F5C1F */
+  --color-sage-700: hsl(104 51% 23%);     /* #1F3D14 */
+
+  /* Mapping existing custom classes to Peach & Sage Green for smooth backward compatibility */
+  --color-navy-900: var(--color-peach-900);
+  --color-navy-800: var(--color-peach-700);
+  --color-navy-700: var(--color-peach-600);
+  --color-navy-600: var(--color-peach-600);
+  --color-teal-500: var(--color-peach-500);
+  --color-teal-400: var(--color-peach-300);
+  --color-teal-300: var(--color-peach-200);
+  --color-mint-100: var(--color-sage-100);
+  --color-mint-50: var(--color-sage-50);
+  --color-amber-500: var(--color-peach-500);
+  --color-amber-400: var(--color-peach-300);
   --color-coral-500: #EF4444;
   --color-coral-400: #F87171;
-  --color-slate-50: #F8FAFC;
-  --color-slate-100: #F1F5F9;
-  --color-slate-200: #E2E8F0;
-  --color-slate-300: #CBD5E1;
-  --color-slate-400: #94A3B8;
-  --color-slate-500: #64748B;
-  --color-slate-600: #475569;
-  --color-slate-700: #334155;
+  --color-slate-50: var(--color-peach-50);       /* Cream page background */
+  --color-slate-100: var(--color-peach-100);
+  --color-slate-200: var(--color-sage-200);
+  --color-slate-300: var(--color-sage-300);
+  --color-slate-400: var(--color-sage-300);
+  --color-slate-500: var(--color-sage-500);
+  --color-slate-600: var(--color-sage-600);
+  --color-slate-700: var(--color-sage-700);
+
   --font-family-sans: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
@@ -111,4 +132,184 @@
   background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   LOGIN / REGISTER — Premium Dark Glassmorphism Design
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Floating background orbs */
+@keyframes loginOrb1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(80px, -60px) scale(1.1); }
+  50% { transform: translate(-30px, 80px) scale(0.95); }
+  75% { transform: translate(-80px, -30px) scale(1.05); }
+}
+@keyframes loginOrb2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(-100px, 50px) scale(1.15); }
+  66% { transform: translate(60px, -80px) scale(0.9); }
+}
+@keyframes loginOrb3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(50px, 60px) scale(1.08); }
+}
+
+.login-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.4;
+}
+.login-orb-1 {
+  width: 400px; height: 400px;
+  background: radial-gradient(circle, rgba(232, 127, 51, 0.25) 0%, transparent 70%);
+  top: -10%; left: -5%;
+  animation: loginOrb1 20s ease-in-out infinite;
+}
+.login-orb-2 {
+  width: 350px; height: 350px;
+  background: radial-gradient(circle, rgba(62, 122, 44, 0.25) 0%, transparent 70%);
+  top: 50%; right: -10%;
+  animation: loginOrb2 25s ease-in-out infinite;
+}
+.login-orb-3 {
+  width: 300px; height: 300px;
+  background: radial-gradient(circle, rgba(212, 106, 30, 0.15) 0%, transparent 70%);
+  bottom: 10%; left: 20%;
+  animation: loginOrb3 18s ease-in-out infinite;
+}
+
+/* ECG heartbeat line animation */
+@keyframes ecgDraw {
+  from { stroke-dashoffset: 2400; }
+  to { stroke-dashoffset: 0; }
+}
+.login-ecg-line {
+  stroke-dasharray: 2400;
+  stroke-dashoffset: 2400;
+  animation: ecgDraw 4s linear infinite;
+}
+
+/* Logo glow effect */
+.login-logo-glow {
+  box-shadow:
+    0 0 30px rgba(232, 127, 51, 0.3),
+    0 0 60px rgba(62, 122, 44, 0.15),
+    0 20px 60px rgba(0,0,0,0.3);
+}
+
+/* Pulse ring */
+@keyframes pulseRing {
+  0% { transform: scale(1); opacity: 0.5; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+.login-pulse-ring {
+  border: 2px solid rgba(232, 127, 51, 0.3);
+  animation: pulseRing 2.5s ease-out infinite;
+}
+
+/* Floating badges */
+@keyframes floatBadge {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+.login-float-badge {
+  animation: floatBadge 3s ease-in-out infinite;
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+/* Float in animation */
+@keyframes loginFloatIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.login-float-in {
+  opacity: 0;
+  animation: loginFloatIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Step enter animation */
+@keyframes stepEnter {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.login-step-enter {
+  animation: stepEnter 0.35s ease-out forwards;
+}
+
+/* Glass card for login/register */
+.login-glass-card {
+  background: rgba(26, 41, 31, 0.6);
+  backdrop-filter: blur(24px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.03),
+    0 20px 60px rgba(0,0,0,0.4),
+    inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+/* Login input */
+.login-input {
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.05);
+  color: white;
+  font-size: 0.875rem;
+  outline: none;
+  transition: all 0.3s ease;
+}
+.login-input::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+.login-input:focus {
+  border-color: rgba(232, 127, 51, 0.5);
+  background: rgba(255,255,255,0.08);
+  box-shadow: 0 0 0 3px rgba(232, 127, 51, 0.15), 0 0 20px rgba(232, 127, 51, 0.05);
+}
+
+/* Submit button */
+.login-submit-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.875rem 1.5rem;
+  border-radius: 0.75rem;
+  font-weight: 700;
+  font-size: 0.9375rem;
+  color: white;
+  background: linear-gradient(135deg, #e87f33 0%, #c2641f 50%, #8a4b1f 100%);
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 8px 32px rgba(232,127,51,0.3), 0 2px 8px rgba(0,0,0,0.2);
+  position: relative;
+  overflow: hidden;
+}
+.login-submit-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 50%);
+  border-radius: inherit;
+}
+.login-submit-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 40px rgba(232,127,51,0.4), 0 4px 12px rgba(0,0,0,0.3);
+}
+.login-submit-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+.login-submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Error background */
+.login-error-bg {
+  background: rgba(239, 68, 68, 0.08);
 }

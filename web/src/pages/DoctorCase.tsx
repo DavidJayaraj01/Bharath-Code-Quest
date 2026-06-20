@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api/client';
-import { ArrowLeft, Send, Loader2, AlertTriangle, CheckCircle2, Pill } from 'lucide-react';
+import { ArrowLeft, Send, Loader2, AlertTriangle, CheckCircle2, Pill, Smartphone } from 'lucide-react';
 import type { Conversation, Patient, VitalReading, MedicationItem } from '../types';
 
 export default function DoctorCase() {
@@ -17,6 +17,8 @@ export default function DoctorCase() {
   const [rxNotes, setRxNotes] = useState('');
   const [meds, setMeds] = useState<MedicationItem[]>([{ name: '', dosage: '', frequency: '', duration: '' }]);
   const [rxSuccess, setRxSuccess] = useState(false);
+  const [reportSending, setReportSending] = useState(false);
+  const [reportMsg, setReportMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     if (!conversationId) return;
@@ -59,6 +61,22 @@ export default function DoctorCase() {
     }
   };
 
+  const sendReportToPatient = async () => {
+    if (!conversationId || reportSending) return;
+    setReportSending(true);
+    setReportMsg(null);
+    try {
+      const { data } = await api.post(`/triage/conversations/${conversationId}/send-report`);
+      setReportMsg({ type: 'success', text: data.message || 'Report sent to patient!' });
+      setTimeout(() => setReportMsg(null), 5000);
+    } catch (err: any) {
+      setReportMsg({ type: 'error', text: err.response?.data?.detail || 'Failed to send report' });
+      setTimeout(() => setReportMsg(null), 5000);
+    } finally {
+      setReportSending(false);
+    }
+  };
+
   if (loading) return <div className="flex items-center justify-center h-full"><Loader2 size={32} className="animate-spin text-teal-500" /></div>;
   if (!conv) return <div className="p-6 text-center text-slate-400">Conversation not found</div>;
 
@@ -83,6 +101,14 @@ export default function DoctorCase() {
                 {conv.severity.toUpperCase()} Severity
               </span>
             </div>
+            {reportMsg && (
+              <div className={`mx-5 mt-2 text-xs px-3 py-2 rounded-lg flex items-center gap-2 ${
+                reportMsg.type === 'success' ? 'bg-teal-50 text-teal-600 border border-teal-200' : 'bg-red-50 text-red-500 border border-red-200'
+              }`}>
+                {reportMsg.type === 'success' ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
+                {reportMsg.text}
+              </div>
+            )}
             <div className="p-5 space-y-3 max-h-[500px] overflow-auto">
               {conv.messages.map(msg => (
                 <div key={msg.id} className={`flex ${msg.role === 'patient' ? 'justify-end' : 'justify-start'}`}>
@@ -102,9 +128,20 @@ export default function DoctorCase() {
           {!rxSuccess && (
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
               {!showRx ? (
-                <button onClick={() => setShowRx(true)} className="w-full py-3 bg-teal-500 hover:bg-teal-400 text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-teal-500/25">
-                  <Pill size={18} /> Write Prescription
-                </button>
+                <div className="flex gap-3">
+                  <button onClick={() => setShowRx(true)} className="flex-1 py-3 bg-teal-500 hover:bg-teal-400 text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-teal-500/25">
+                    <Pill size={18} /> Write Prescription
+                  </button>
+                  <button
+                    onClick={sendReportToPatient}
+                    disabled={reportSending}
+                    className="py-3 px-5 bg-teal-50 hover:bg-teal-100 text-teal-600 font-semibold rounded-xl transition-colors flex items-center gap-2 disabled:opacity-50 border border-teal-200"
+                    title="Send triage report to patient's registered WhatsApp number"
+                  >
+                    {reportSending ? <Loader2 size={16} className="animate-spin" /> : <Smartphone size={16} />}
+                    Send Report
+                  </button>
+                </div>
               ) : (
                 <div className="space-y-4">
                   <h3 className="font-semibold text-navy-900">New Prescription</h3>

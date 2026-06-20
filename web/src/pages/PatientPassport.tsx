@@ -34,7 +34,14 @@ export default function PatientPassport() {
   const [vitals, setVitals] = useState<VitalReading[]>([]);
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [history, setHistory] = useState<ConversationSummary[]>([]);
+  const [fhirData, setFhirData] = useState<any>(null);
   const [activeVital, setActiveVital] = useState('heart_rate');
+
+  // Nearby Hospitals & Appointments
+  const [hospitals, setHospitals] = useState<any[]>([]);
+  const [appointingDocId, setAppointingDocId] = useState<string | null>(null);
+  const [appointSuccess, setAppointSuccess] = useState<string | null>(null);
+  const [appointError, setAppointError] = useState<string | null>(null);
   
   // IoT state
   const [device, setDevice] = useState<DispenserDevice | null>(null);
@@ -50,11 +57,15 @@ export default function PatientPassport() {
       api.get('/passport/prescriptions'),
       api.get('/passport/history'),
       api.get('/iot/devices'),
-    ]).then(([p, v, rx, h, devRes]) => {
+      api.get('/passport/fhir'),
+      api.get('/passport/nearby-hospitals'),
+    ]).then(([p, v, rx, h, devRes, fhirRes, hospRes]) => {
       setProfile(p.data);
       setVitals(v.data);
       setPrescriptions(rx.data);
       setHistory(h.data);
+      setFhirData(fhirRes.data);
+      setHospitals(hospRes.data);
       
       const patientDevice = devRes.data[0] || null;
       setDevice(patientDevice);
@@ -75,12 +86,36 @@ export default function PatientPassport() {
     }).catch(() => setLoading(false));
   }, []);
 
+  const handleAppoint = async (doctorId: string) => {
+    setAppointingDocId(doctorId);
+    setAppointSuccess(null);
+    setAppointError(null);
+    try {
+      const activeConv = history.find(h => h.status === 'active' || h.status === 'escalated');
+      const { data } = await api.post('/passport/appoint', {
+        doctor_id: doctorId,
+        conversation_id: activeConv?.id || null
+      });
+      if (data.success) {
+        setAppointSuccess(data.message);
+        // Refresh history to reflect escalation/assignment
+        const histRes = await api.get('/passport/history');
+        setHistory(histRes.data);
+      }
+    } catch (err: any) {
+      setAppointError(err.response?.data?.detail || 'Failed to request appointment');
+    } finally {
+      setAppointingDocId(null);
+    }
+  };
+
   // Connect to device websocket for real-time status updates
   useEffect(() => {
     if (!device || !token) return;
     
     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const ws = new WebSocket(`${protocol}://${window.location.host}/api/iot/ws/${device.id}?token=${token}`);
+    const host = window.location.hostname === 'localhost' ? 'localhost:8000' : window.location.host;
+    const ws = new WebSocket(`${protocol}://${host}/api/iot/ws/${device.id}?token=${token}`);
     wsRef.current = ws;
 
     ws.onmessage = (event) => {
@@ -185,6 +220,80 @@ export default function PatientPassport() {
         </div>
       </div>
 
+      {/* Nearby Hospital Care Panel */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 animate-fade-in">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+              <span className="text-peach-500">🏥</span> Nearby Hospital Care
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">Hospitals and doctors in your city: <span className="font-semibold text-slate-600">{profile?.city || 'Chennai'}</span></p>
+          </div>
+          <span className="text-xs bg-peach-50 text-peach-600 px-3 py-1 rounded-full font-medium">
+            Emergency & General Care
+          </span>
+        </div>
+
+        {appointSuccess && (
+          <div className="mb-4 flex items-center gap-2 p-3 rounded-xl text-sm bg-teal-50 border border-teal-200 text-teal-700 animate-slide-in">
+            <CheckCircle2 size={16} className="text-teal-600 shrink-0" />
+            <span>{appointSuccess}</span>
+          </div>
+        )}
+
+        {appointError && (
+          <div className="mb-4 flex items-center gap-2 p-3 rounded-xl text-sm bg-red-50 border border-red-200 text-red-700 animate-slide-in">
+            <AlertCircle size={16} className="text-red-600 shrink-0" />
+            <span>{appointError}</span>
+          </div>
+        )}
+
+        {hospitals.length === 0 ? (
+          <div className="text-center p-6 text-slate-400 text-sm bg-slate-50 rounded-xl">
+            No healthcare facilities found in your area. Contact rural health support or emergency helpline.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {hospitals.map((hosp, i) => (
+              <div key={i} className="p-5 border border-slate-100 rounded-xl bg-slate-50/50 hover:bg-slate-50 hover:shadow-sm transition-all duration-300 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h4 className="font-bold text-navy-900 text-base">{hosp.hospital_name}</h4>
+                      <p className="text-xs text-slate-400 mt-0.5">{hosp.city}, {hosp.state}</p>
+                    </div>
+                    <span className="text-xs text-teal-600 font-semibold bg-teal-50 px-2 py-0.5 rounded">Active</span>
+                  </div>
+
+                  <div className="mt-4 space-y-3">
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Available Doctors</p>
+                    {hosp.doctors.map((doc: any, j: number) => (
+                      <div key={j} className="flex items-center justify-between p-3 bg-white rounded-lg border border-slate-100">
+                        <div>
+                          <p className="text-sm font-semibold text-navy-900">{doc.name}</p>
+                          <p className="text-xs text-slate-400">{doc.specialty} • {doc.experience} Years Exp.</p>
+                        </div>
+                        <button
+                          onClick={() => handleAppoint(doc.id)}
+                          disabled={appointingDocId === doc.id || !doc.is_available}
+                          className="px-3 py-1.5 bg-peach-500 hover:bg-peach-400 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50"
+                        >
+                          {appointingDocId === doc.id ? (
+                            <Loader2 size={12} className="animate-spin" />
+                          ) : (
+                            'Appoint & Share Passport'
+                          )}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Vitals Grid + Chart */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Latest Vitals */}
@@ -268,6 +377,51 @@ export default function PatientPassport() {
             <Clock size={12} />
             <span>Scheduled dose times: {device.schedule_times.join(', ')}</span>
           </div>
+
+          {/* Manual Dispenser Controls */}
+          <div className="mt-5 pt-5 border-t border-slate-100">
+            <p className="text-[11px] text-slate-400 font-semibold uppercase mb-3">Manual Controls (Demo)</p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                id="iot-take-dose-btn"
+                onClick={async () => {
+                  try {
+                    const res = await api.post(`/iot/devices/${device.id}/take-dose`);
+                    setDevice(prev => prev ? { ...prev, state: 'dispensed' } : null);
+                    setAdherenceRate(res.data.adherence_rate);
+                  } catch (err) { console.error(err); }
+                }}
+                className="w-full sm:w-auto justify-center px-4 py-2.5 bg-teal-500 hover:bg-teal-400 text-white text-xs font-semibold rounded-xl transition-all shadow-sm shadow-teal-500/20 flex items-center gap-2"
+              >
+                <CheckCircle2 size={14} /> Take Dose
+              </button>
+              <button
+                id="iot-miss-dose-btn"
+                onClick={async () => {
+                  try {
+                    const res = await api.post(`/iot/devices/${device.id}/miss-dose`);
+                    setDevice(prev => prev ? { ...prev, state: 'missed' } : null);
+                    setAdherenceRate(res.data.adherence_rate);
+                  } catch (err) { console.error(err); }
+                }}
+                className="w-full sm:w-auto justify-center px-4 py-2.5 bg-coral-500 hover:bg-coral-400 text-white text-xs font-semibold rounded-xl transition-all shadow-sm shadow-coral-500/20 flex items-center gap-2"
+              >
+                <AlertCircle size={14} /> Miss Dose
+              </button>
+              <button
+                id="iot-reset-btn"
+                onClick={async () => {
+                  try {
+                    await api.post(`/iot/devices/${device.id}/reset`);
+                    setDevice(prev => prev ? { ...prev, state: 'locked' } : null);
+                  } catch (err) { console.error(err); }
+                }}
+                className="w-full sm:w-auto justify-center px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold rounded-xl transition-all flex items-center gap-2"
+              >
+                <Lock size={14} /> Reset Device
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -345,6 +499,59 @@ export default function PatientPassport() {
           )}
         </div>
       </div>
+
+      {/* FHIR Record View */}
+      {fhirData && (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 animate-fade-in">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+              <FileText size={16} className="text-teal-500" />
+              FHIR R4 Digital Health Passport
+            </h3>
+            <span className="text-[10px] bg-teal-50 text-teal-600 px-2.5 py-0.5 rounded-full font-bold uppercase">
+              Standard Compliant
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-4">
+            <div className="p-3 bg-slate-50 rounded-xl">
+              <p className="text-[10px] text-slate-400 font-semibold uppercase">ABHA Official ID</p>
+              <p className="font-bold text-navy-900 mt-0.5">
+                {fhirData.identifier?.[0]?.value || '—'}
+              </p>
+            </div>
+            <div className="p-3 bg-slate-50 rounded-xl">
+              <p className="text-[10px] text-slate-400 font-semibold uppercase">FHIR Resource Type</p>
+              <p className="font-bold text-navy-900 mt-0.5">{fhirData.resourceType}</p>
+            </div>
+            <div className="p-3 bg-slate-50 rounded-xl">
+              <p className="text-[10px] text-slate-400 font-semibold uppercase">Official Name</p>
+              <p className="font-bold text-navy-900 mt-0.5">{fhirData.name?.[0]?.text || '—'}</p>
+            </div>
+            <div className="p-3 bg-slate-50 rounded-xl">
+              <p className="text-[10px] text-slate-400 font-semibold uppercase">Contact Telecom</p>
+              <p className="font-bold text-navy-900 mt-0.5">
+                {fhirData.telecom?.[0]?.value || '—'} ({fhirData.telecom?.[0]?.use})
+              </p>
+            </div>
+          </div>
+
+          {/* Collapsible raw JSON */}
+          <details 
+            className="group mt-4 border border-slate-100 rounded-xl overflow-hidden" 
+            open={window.innerWidth >= 1024}
+          >
+            <summary className="list-none flex items-center justify-between p-3 bg-slate-50 cursor-pointer select-none">
+              <span className="text-xs font-semibold text-slate-500 uppercase">Raw FHIR R4 JSON Payload</span>
+              <span className="text-xs text-teal-500 group-open:hidden">Show JSON</span>
+              <span className="text-xs text-teal-500 hidden group-open:inline">Hide JSON</span>
+            </summary>
+            <div className="p-4 bg-navy-900 text-white font-mono text-xs overflow-x-auto whitespace-pre rounded-b-xl max-h-[300px]">
+              {JSON.stringify(fhirData, null, 2)}
+            </div>
+          </details>
+        </div>
+      )}
     </div>
   );
 }

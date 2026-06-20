@@ -30,6 +30,12 @@ class Settings(BaseSettings):
     # ── IoT Simulator ────────────────────────────────────
     IOT_DEMO_DAY_SECONDS: int = 120  # 2 minutes = 1 "day" in demo mode
 
+    # ── Twilio ───────────────────────────────────────────
+    TWILIO_ACCOUNT_SID: Optional[str] = None
+    TWILIO_AUTH_TOKEN: Optional[str] = None
+    TWILIO_WHATSAPP_FROM: str = "whatsapp:+14155238886"
+    TWILIO_SMS_FROM: Optional[str] = None
+
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",
