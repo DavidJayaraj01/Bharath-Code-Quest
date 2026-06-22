@@ -250,15 +250,61 @@ export default function PatientPassport() {
     );
   }
 
-  // Fallback for Glucose or empty vitals
-  const displayedVitals = activeVital === 'glucose' && vitals.filter(v => v.reading_type === 'glucose').length === 0
-    ? [
-        { id: '1', reading_type: 'glucose', value: 110, unit: 'mg/dL', recorded_at: new Date(Date.now() - 6 * 24 * 3600 * 1000).toISOString() },
-        { id: '2', reading_type: 'glucose', value: 125, unit: 'mg/dL', recorded_at: new Date(Date.now() - 4 * 24 * 3600 * 1000).toISOString() },
-        { id: '3', reading_type: 'glucose', value: 145, unit: 'mg/dL', recorded_at: new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString() },
-        { id: '4', reading_type: 'glucose', value: 115, unit: 'mg/dL', recorded_at: new Date().toISOString() },
-      ] as VitalReading[]
-    : vitals.filter(v => v.reading_type === activeVital);
+  // Fallback for empty vitals
+  const getDummyVitals = (type: string): VitalReading[] => {
+    const now = Date.now();
+    const oneDay = 24 * 3600 * 1000;
+    if (type === 'heart_rate') {
+      return [
+        { id: 'h4', reading_type: 'heart_rate', value: 74, unit: 'bpm', recorded_at: new Date().toISOString() },
+        { id: 'h3', reading_type: 'heart_rate', value: 80, unit: 'bpm', recorded_at: new Date(now - 2 * oneDay).toISOString() },
+        { id: 'h2', reading_type: 'heart_rate', value: 75, unit: 'bpm', recorded_at: new Date(now - 4 * oneDay).toISOString() },
+        { id: 'h1', reading_type: 'heart_rate', value: 72, unit: 'bpm', recorded_at: new Date(now - 6 * oneDay).toISOString() },
+      ] as VitalReading[];
+    }
+    if (type === 'bp_systolic') {
+      return [
+        { id: 'b4', reading_type: 'bp_systolic', value: 119, unit: 'mmHg', recorded_at: new Date().toISOString() },
+        { id: 'b3', reading_type: 'bp_systolic', value: 124, unit: 'mmHg', recorded_at: new Date(now - 2 * oneDay).toISOString() },
+        { id: 'b2', reading_type: 'bp_systolic', value: 120, unit: 'mmHg', recorded_at: new Date(now - 4 * oneDay).toISOString() },
+        { id: 'b1', reading_type: 'bp_systolic', value: 118, unit: 'mmHg', recorded_at: new Date(now - 6 * oneDay).toISOString() },
+      ] as VitalReading[];
+    }
+    if (type === 'spo2') {
+      return [
+        { id: 's4', reading_type: 'spo2', value: 98, unit: '%', recorded_at: new Date().toISOString() },
+        { id: 's3', reading_type: 'spo2', value: 99, unit: '%', recorded_at: new Date(now - 2 * oneDay).toISOString() },
+        { id: 's2', reading_type: 'spo2', value: 97, unit: '%', recorded_at: new Date(now - 4 * oneDay).toISOString() },
+        { id: 's1', reading_type: 'spo2', value: 98, unit: '%', recorded_at: new Date(now - 6 * oneDay).toISOString() },
+      ] as VitalReading[];
+    }
+    if (type === 'glucose') {
+      return [
+        { id: 'g4', reading_type: 'glucose', value: 115, unit: 'mg/dL', recorded_at: new Date().toISOString() },
+        { id: 'g3', reading_type: 'glucose', value: 145, unit: 'mg/dL', recorded_at: new Date(now - 2 * oneDay).toISOString() },
+        { id: 'g2', reading_type: 'glucose', value: 125, unit: 'mg/dL', recorded_at: new Date(now - 4 * oneDay).toISOString() },
+        { id: 'g1', reading_type: 'glucose', value: 110, unit: 'mg/dL', recorded_at: new Date(now - 6 * oneDay).toISOString() },
+      ] as VitalReading[];
+    }
+    return [];
+  };
+
+  const filteredVitals = vitals.filter(v => v.reading_type === activeVital);
+  const displayedVitals = filteredVitals.length === 0 ? getDummyVitals(activeVital) : filteredVitals;
+
+  const dummyPrescriptions = [
+    {
+      id: 'dummy-rx-1',
+      diagnosis: 'Essential Hypertension & Type-2 Diabetes Management',
+      created_at: new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString(),
+      medications: [
+        { name: 'Metformin', dosage: '500mg', frequency: 'Twice daily after meals' },
+        { name: 'Amlodipine', dosage: '5mg', frequency: 'Once daily in the morning' }
+      ]
+    }
+  ] as Prescription[];
+
+  const displayedPrescriptions = prescriptions.length === 0 ? dummyPrescriptions : prescriptions;
 
   // Prepare chart data for active vital
   const chartData = [...displayedVitals]
@@ -612,12 +658,12 @@ export default function PatientPassport() {
           Active Prescriptions
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {prescriptions.length === 0 ? (
+          {displayedPrescriptions.length === 0 ? (
             <div className="bg-white rounded-2xl border border-slate-100 p-8 text-center text-sm text-slate-400 md:col-span-2">
               No prescriptions yet
             </div>
           ) : (
-            prescriptions.map((rx) => (
+            displayedPrescriptions.map((rx) => (
               <div key={rx.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 flex flex-col justify-between hover:shadow-md transition-all duration-300">
                 <div>
                   <div className="flex items-start justify-between">

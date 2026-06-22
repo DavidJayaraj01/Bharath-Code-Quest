@@ -55,7 +55,7 @@ def _seed(db):
         {"email": "priya.sharma@demo.vitalbridge.in", "name": "Priya Sharma",
          "gender": "Female", "city": "Mumbai", "state": "Maharashtra", "blood": "B+",
          "allergies": ["Penicillin"], "conditions": ["Type 2 Diabetes"],
-         "phone": "+91-98201-XXXXX", "dob": datetime(1988, 3, 15, tzinfo=timezone.utc)},
+         "phone": "+91-9840488355", "dob": datetime(1988, 3, 15, tzinfo=timezone.utc)},
         {"email": "arjun.patel@demo.vitalbridge.in", "name": "Arjun Patel",
          "gender": "Male", "city": "Delhi", "state": "Delhi", "blood": "O+",
          "allergies": [], "conditions": ["Hypertension"],
