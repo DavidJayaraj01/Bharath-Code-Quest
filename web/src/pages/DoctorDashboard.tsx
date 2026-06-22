@@ -30,9 +30,16 @@ export default function DoctorDashboard() {
   // WebSocket for live updates
   useEffect(() => {
     if (!token) return;
-    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const host = window.location.hostname === 'localhost' ? 'localhost:8000' : window.location.host;
-    const ws = new WebSocket(`${protocol}://${host}/api/doctor/ws/queue?token=${token}`);
+    let wsUrl = import.meta.env.VITE_BACKEND_WS_URL;
+    if (wsUrl) {
+      if (!wsUrl.endsWith('/')) wsUrl += '/';
+      wsUrl += `api/doctor/ws/queue?token=${token}`;
+    } else {
+      const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      const host = window.location.hostname === 'localhost' ? 'localhost:8000' : window.location.host;
+      wsUrl = `${protocol}://${host}/api/doctor/ws/queue?token=${token}`;
+    }
+    const ws = new WebSocket(wsUrl);
     ws.onmessage = (e) => {
       const data = JSON.parse(e.data);
       if (data.type === 'new_escalation') {

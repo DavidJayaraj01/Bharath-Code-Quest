@@ -81,9 +81,16 @@ export default function SurveillanceDashboard() {
   // Live WebSocket for both Surveillance and IoT Adherence
   useEffect(() => {
     if (!token) return;
-    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const host = window.location.hostname === 'localhost' ? 'localhost:8000' : window.location.host;
-    const ws = new WebSocket(`${protocol}://${host}/api/surveillance/ws?token=${token}`);
+    let wsUrl = import.meta.env.VITE_BACKEND_WS_URL;
+    if (wsUrl) {
+      if (!wsUrl.endsWith('/')) wsUrl += '/';
+      wsUrl += `api/surveillance/ws?token=${token}`;
+    } else {
+      const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      const host = window.location.hostname === 'localhost' ? 'localhost:8000' : window.location.host;
+      wsUrl = `${protocol}://${host}/api/surveillance/ws?token=${token}`;
+    }
+    const ws = new WebSocket(wsUrl);
 
     ws.onmessage = (e) => {
       const data = JSON.parse(e.data);
@@ -123,7 +130,7 @@ export default function SurveillanceDashboard() {
 
   const categoryTotals: Record<string, number> = {};
   summary?.regions.forEach(r => {
-    Object.entries(r.categories).forEach(([cat, count]) => {
+    (Object.entries(r.categories) as [string, number][]).forEach(([cat, count]) => {
       categoryTotals[cat] = (categoryTotals[cat] || 0) + count;
     });
   });
@@ -347,7 +354,7 @@ export default function SurveillanceDashboard() {
                       </div>
                       <div className="pt-2 border-t border-slate-100">
                         <p className="text-xs text-slate-400 mb-2">Breakdown</p>
-                        {Object.entries(selectedRegion.categories).map(([cat, count]) => (
+                        {(Object.entries(selectedRegion.categories) as [string, number][]).map(([cat, count]) => (
                           <div key={cat} className="flex items-center justify-between py-1">
                             <span className="text-xs capitalize text-slate-500">{cat}</span>
                             <div className="flex items-center gap-2">

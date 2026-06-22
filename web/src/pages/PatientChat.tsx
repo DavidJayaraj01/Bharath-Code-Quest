@@ -213,9 +213,15 @@ export default function PatientChat() {
 
   useEffect(() => {
     if (!conversationId || !token) return;
-    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const host = window.location.hostname === 'localhost' ? 'localhost:8000' : window.location.host;
-    const wsUrl = `${protocol}://${host}/api/triage/ws/${conversationId}?token=${token}`;
+    let wsUrl = import.meta.env.VITE_BACKEND_WS_URL;
+    if (wsUrl) {
+      if (!wsUrl.endsWith('/')) wsUrl += '/';
+      wsUrl += `api/triage/ws/${conversationId}?token=${token}`;
+    } else {
+      const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      const host = window.location.hostname === 'localhost' ? 'localhost:8000' : window.location.host;
+      wsUrl = `${protocol}://${host}/api/triage/ws/${conversationId}?token=${token}`;
+    }
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 

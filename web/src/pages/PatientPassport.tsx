@@ -196,9 +196,16 @@ export default function PatientPassport() {
   useEffect(() => {
     if (!device || !token) return;
     
-    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const host = window.location.hostname === 'localhost' ? 'localhost:8000' : window.location.host;
-    const ws = new WebSocket(`${protocol}://${host}/api/iot/ws/${device.id}?token=${token}`);
+    let wsUrl = import.meta.env.VITE_BACKEND_WS_URL;
+    if (wsUrl) {
+      if (!wsUrl.endsWith('/')) wsUrl += '/';
+      wsUrl += `api/iot/ws/${device.id}?token=${token}`;
+    } else {
+      const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      const host = window.location.hostname === 'localhost' ? 'localhost:8000' : window.location.host;
+      wsUrl = `${protocol}://${host}/api/iot/ws/${device.id}?token=${token}`;
+    }
+    const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onmessage = (event) => {
@@ -224,9 +231,16 @@ export default function PatientPassport() {
   useEffect(() => {
     if (!profile || !token) return;
     
-    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const host = window.location.hostname === 'localhost' ? 'localhost:8000' : window.location.host;
-    const ws = new WebSocket(`${protocol}://${host}/api/risk/ws/${profile.id}?token=${token}`);
+    let wsUrl = import.meta.env.VITE_BACKEND_WS_URL;
+    if (wsUrl) {
+      if (!wsUrl.endsWith('/')) wsUrl += '/';
+      wsUrl += `api/risk/ws/${profile.id}?token=${token}`;
+    } else {
+      const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      const host = window.location.hostname === 'localhost' ? 'localhost:8000' : window.location.host;
+      wsUrl = `${protocol}://${host}/api/risk/ws/${profile.id}?token=${token}`;
+    }
+    const ws = new WebSocket(wsUrl);
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
@@ -322,7 +336,7 @@ export default function PatientPassport() {
     glucose: { ceiling: 140, unit: 'mg/dL', name: 'Glucose' },
   };
 
-  const currentRange = vitalRangeConfig[activeVital] || { ceiling: 100, unit: '', name: activeVital };
+  const currentRange = vitalRangeConfig[activeVital] || { ceiling: 100, floor: undefined, unit: '', name: activeVital };
 
   // Calculate stats for selected vital
   const currentVal = displayedVitals[0]?.value || '—';
