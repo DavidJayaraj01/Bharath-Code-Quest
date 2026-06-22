@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import api from '../api/client';
-import { Shield, Loader2, AlertCircle, Heart, Activity, Eye, EyeOff } from 'lucide-react';
+import { Loader2, AlertCircle, Heart, Activity, Eye, EyeOff } from 'lucide-react';
+import logoImg from '../assets/logo.png';
 import type { TokenResponse } from '../types';
 
 export default function Login() {
@@ -41,7 +42,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #111c14 0%, #1a2a1f 25%, #2a1f18 50%, #1a2a1f 75%, #111c14 100%)' }}>
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #130d0a 0%, #1c130d 25%, #2c1a11 50%, #1c130d 75%, #130d0a 100%)' }}>
       {/* Animated Background Orbs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="login-orb login-orb-1" />
@@ -51,7 +52,7 @@ export default function Login() {
         <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.8) 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
         {/* Decorative ECG Line */}
         <svg className="absolute bottom-0 left-0 w-full h-32 opacity-10" viewBox="0 0 1200 120" preserveAspectRatio="none">
-          <path d="M0,60 L200,60 L220,20 L240,100 L260,40 L280,80 L300,60 L500,60 L520,10 L540,110 L560,30 L580,90 L600,60 L800,60 L820,15 L840,105 L860,35 L880,85 L900,60 L1200,60" fill="none" stroke="#e87f33" strokeWidth="2" className="login-ecg-line" />
+          <path d="M0,60 L200,60 L220,20 L240,100 L260,40 L280,80 L300,60 L500,60 L520,10 L540,110 L560,30 L580,90 L600,60 L800,60 L820,15 L840,105 L860,35 L880,85 L900,60 L1200,60" fill="none" stroke="#FF9C5F" strokeWidth="2" className="login-ecg-line" />
         </svg>
       </div>
 
@@ -59,8 +60,8 @@ export default function Login() {
         {/* Logo Section */}
         <div className="text-center mb-8 login-float-in" style={{ animationDelay: '0.1s' }}>
           <div className="relative inline-block mb-5">
-            <div className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto shadow-2xl login-logo-glow" style={{ background: 'linear-gradient(135deg, #e87f33 0%, #3e7a2c 100%)' }}>
-              <Shield size={36} className="text-white drop-shadow-lg" />
+            <div className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto shadow-2xl login-logo-glow overflow-hidden bg-slate-950/80 p-3.5 border border-white/10">
+              <img src={logoImg} alt="VitalBridge Logo" className="object-contain w-full h-full" />
             </div>
             {/* Pulse ring */}
             <div className="absolute inset-0 rounded-3xl login-pulse-ring" />

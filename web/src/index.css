@@ -1,47 +1,58 @@
 @import "tailwindcss";
 
 @theme {
-  /* Peach Ramp */
-  --color-peach-50: hsl(33 100% 97%);     /* #FFF8F2 */
-  --color-peach-100: hsl(28 100% 90%);    /* #FFE8D6 */
-  --color-peach-200: hsl(26 100% 82%);    /* #FFD4AD */
-  --color-peach-300: hsl(24 100% 70%);    /* #FFB87A */
-  --color-peach-500: hsl(24 79% 60%);     /* #E87F33 */
-  --color-peach-600: hsl(22 70% 50%);     /* #C2641F */
-  --color-peach-700: hsl(22 65% 38%);     /* #8A4B1F */
-  --color-peach-900: hsl(20 55% 16%);     /* #3D2310 */
+  /* Cream / Custard Ramp (#FCEFC3) */
+  --color-cream-50: hsl(45 100% 98%);     /* #FFFDF5 */
+  --color-cream-100: hsl(45 100% 95%);    /* #FFF9E6 */
+  --color-cream-200: hsl(45 92% 90%);     /* #FFF2CC */
+  --color-cream-300: hsl(45 88% 87%);     /* #FCEFC3 */
+  --color-cream-400: hsl(42 75% 75%);     /* #EAD093 */
+  --color-cream-500: hsl(38 60% 60%);     /* #D1B164 */
+  --color-cream-600: hsl(36 55% 48%);     /* #B5933A */
+  --color-cream-700: hsl(34 58% 35%);     /* #8B6B1F */
+  --color-cream-900: hsl(32 60% 12%);     /* #312306 */
 
-  /* Sage Green Ramp */
-  --color-sage-50: hsl(96 45% 95%);       /* #F4FAF0 */
-  --color-sage-100: hsl(96 40% 88%);      /* #E8F5E0 */
-  --color-sage-200: hsl(95 42% 78%);      /* #C5E8B0 */
-  --color-sage-300: hsl(96 40% 64%);      /* #9AD17F */
-  --color-sage-500: hsl(100 47% 41%);     /* #3E7A2C */
-  --color-sage-600: hsl(102 53% 33%);     /* #2F5C1F */
-  --color-sage-700: hsl(104 51% 23%);     /* #1F3D14 */
+  /* Peach / Orange Ramp (#FF9C5F) */
+  --color-peach-50: hsl(23 100% 97%);     /* #FFF5F0 */
+  --color-peach-100: hsl(23 100% 92%);    /* #FFE6D5 */
+  --color-peach-200: hsl(23 100% 84%);    /* #FFCDB0 */
+  --color-peach-300: hsl(23 100% 75%);    /* #FFAE82 */
+  --color-peach-500: hsl(23 100% 69%);    /* #FF9C5F */
+  --color-peach-600: hsl(23 88% 58%);     /* #E87F3B */
+  --color-peach-700: hsl(23 75% 48%);     /* #C25B20 */
+  --color-peach-900: hsl(23 72% 16%);     /* #461C07 */
 
-  /* Mapping existing custom classes to Peach & Sage Green for smooth backward compatibility */
-  --color-navy-900: var(--color-peach-900);
-  --color-navy-800: var(--color-peach-700);
-  --color-navy-700: var(--color-peach-600);
-  --color-navy-600: var(--color-peach-600);
-  --color-teal-500: var(--color-peach-500);
+  /* Sage Green Ramp - redesigned to be a professional, harmonious sage green that complements cream & peach */
+  --color-sage-50: hsl(75 35% 96%);       /* #F4F7F0 */
+  --color-sage-100: hsl(75 30% 90%);      /* #E9EFE0 */
+  --color-sage-200: hsl(75 28% 80%);      /* #D3E0C5 */
+  --color-sage-300: hsl(75 25% 68%);      /* #B4C5A1 */
+  --color-sage-500: hsl(75 30% 45%);      /* #6E8552 */
+  --color-sage-600: hsl(75 33% 36%);      /* #576B3F */
+  --color-sage-700: hsl(75 35% 26%);      /* #3E4D2C */
+
+  /* Mapping existing custom classes to Cream & Peach for professional design */
+  --color-navy-900: #1C1510;              /* Extremely rich premium dark charcoal-brown */
+  --color-navy-800: #2C2018;
+  --color-navy-700: #3E2F24;
+  --color-navy-600: #554133;
+  --color-teal-500: var(--color-peach-500); /* maps to the vibrant #FF9C5F */
   --color-teal-400: var(--color-peach-300);
   --color-teal-300: var(--color-peach-200);
-  --color-mint-100: var(--color-sage-100);
-  --color-mint-50: var(--color-sage-50);
+  --color-mint-100: var(--color-cream-100);
+  --color-mint-50: var(--color-cream-50);
   --color-amber-500: var(--color-peach-500);
   --color-amber-400: var(--color-peach-300);
-  --color-coral-500: #EF4444;
-  --color-coral-400: #F87171;
-  --color-slate-50: var(--color-peach-50);       /* Cream page background */
-  --color-slate-100: var(--color-peach-100);
-  --color-slate-200: var(--color-sage-200);
-  --color-slate-300: var(--color-sage-300);
-  --color-slate-400: var(--color-sage-300);
-  --color-slate-500: var(--color-sage-500);
-  --color-slate-600: var(--color-sage-600);
-  --color-slate-700: var(--color-sage-700);
+  --color-coral-500: #E05A47;
+  --color-coral-400: #F38B7C;
+  --color-slate-50: var(--color-cream-50);    /* Custom page background: #FFFDF5 */
+  --color-slate-100: var(--color-cream-100);  /* Soft cream panels: #FFF9E6 */
+  --color-slate-200: var(--color-cream-200);  /* #FFF2CC */
+  --color-slate-300: var(--color-cream-300);  /* The exact cream #FCEFC3! */
+  --color-slate-400: var(--color-cream-400);
+  --color-slate-500: var(--color-cream-500);
+  --color-slate-600: var(--color-cream-600);
+  --color-slate-700: var(--color-cream-700);
 
   --font-family-sans: 'Inter', system-ui, -apple-system, sans-serif;
 }
@@ -164,19 +175,19 @@
 }
 .login-orb-1 {
   width: 400px; height: 400px;
-  background: radial-gradient(circle, rgba(232, 127, 51, 0.25) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(255, 156, 95, 0.25) 0%, transparent 70%);
   top: -10%; left: -5%;
   animation: loginOrb1 20s ease-in-out infinite;
 }
 .login-orb-2 {
   width: 350px; height: 350px;
-  background: radial-gradient(circle, rgba(62, 122, 44, 0.25) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(252, 239, 195, 0.2) 0%, transparent 70%);
   top: 50%; right: -10%;
   animation: loginOrb2 25s ease-in-out infinite;
 }
 .login-orb-3 {
   width: 300px; height: 300px;
-  background: radial-gradient(circle, rgba(212, 106, 30, 0.15) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(255, 156, 95, 0.15) 0%, transparent 70%);
   bottom: 10%; left: 20%;
   animation: loginOrb3 18s ease-in-out infinite;
 }
@@ -195,8 +206,8 @@
 /* Logo glow effect */
 .login-logo-glow {
   box-shadow:
-    0 0 30px rgba(232, 127, 51, 0.3),
-    0 0 60px rgba(62, 122, 44, 0.15),
+    0 0 30px rgba(255, 156, 95, 0.3),
+    0 0 60px rgba(252, 239, 195, 0.15),
     0 20px 60px rgba(0,0,0,0.3);
 }
 
@@ -206,7 +217,7 @@
   100% { transform: scale(1.6); opacity: 0; }
 }
 .login-pulse-ring {
-  border: 2px solid rgba(232, 127, 51, 0.3);
+  border: 2px solid rgba(255, 156, 95, 0.3);
   animation: pulseRing 2.5s ease-out infinite;
 }
 
@@ -242,7 +253,7 @@
 
 /* Glass card for login/register */
 .login-glass-card {
-  background: rgba(26, 41, 31, 0.6);
+  background: rgba(28, 19, 13, 0.65);
   backdrop-filter: blur(24px) saturate(1.4);
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow:
@@ -266,9 +277,9 @@
   color: rgba(255, 255, 255, 0.35);
 }
 .login-input:focus {
-  border-color: rgba(232, 127, 51, 0.5);
+  border-color: rgba(255, 156, 95, 0.5);
   background: rgba(255,255,255,0.08);
-  box-shadow: 0 0 0 3px rgba(232, 127, 51, 0.15), 0 0 20px rgba(232, 127, 51, 0.05);
+  box-shadow: 0 0 0 3px rgba(255, 156, 95, 0.15), 0 0 20px rgba(255, 156, 95, 0.05);
 }
 
 /* Submit button */
@@ -282,11 +293,11 @@
   font-weight: 700;
   font-size: 0.9375rem;
   color: white;
-  background: linear-gradient(135deg, #e87f33 0%, #c2641f 50%, #8a4b1f 100%);
+  background: linear-gradient(135deg, #FF9C5F 0%, #E87F3B 50%, #C25B20 100%);
   border: none;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 8px 32px rgba(232,127,51,0.3), 0 2px 8px rgba(0,0,0,0.2);
+  box-shadow: 0 8px 32px rgba(255,156,95,0.3), 0 2px 8px rgba(0,0,0,0.2);
   position: relative;
   overflow: hidden;
 }
@@ -299,7 +310,7 @@
 }
 .login-submit-btn:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 12px 40px rgba(232,127,51,0.4), 0 4px 12px rgba(0,0,0,0.3);
+  box-shadow: 0 12px 40px rgba(255,156,95,0.4), 0 4px 12px rgba(0,0,0,0.3);
 }
 .login-submit-btn:active:not(:disabled) {
   transform: translateY(0);
@@ -312,4 +323,107 @@
 /* Error background */
 .login-error-bg {
   background: rgba(239, 68, 68, 0.08);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   VOICE INPUT — Waveform, Pulsing Indicator, Mic Transitions
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Waveform bars bouncing animation */
+@keyframes waveformBounce1 {
+  0%, 100% { height: 8px; }
+  50% { height: 22px; }
+}
+@keyframes waveformBounce2 {
+  0%, 100% { height: 14px; }
+  50% { height: 28px; }
+}
+@keyframes waveformBounce3 {
+  0%, 100% { height: 10px; }
+  50% { height: 20px; }
+}
+
+.voice-waveform-bar {
+  display: inline-block;
+  width: 3px;
+  border-radius: 2px;
+  background: white;
+  margin: 0 2px;
+  vertical-align: middle;
+}
+.voice-waveform-bar:nth-child(1) {
+  animation: waveformBounce1 0.6s ease-in-out infinite;
+}
+.voice-waveform-bar:nth-child(2) {
+  animation: waveformBounce2 0.5s ease-in-out infinite;
+  animation-delay: 0.1s;
+}
+.voice-waveform-bar:nth-child(3) {
+  animation: waveformBounce3 0.7s ease-in-out infinite;
+  animation-delay: 0.2s;
+}
+
+/* Pulsing recording ring */
+@keyframes voicePulseRing {
+  0% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.35); opacity: 0; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
+.voice-pulse-ring {
+  position: absolute;
+  inset: -4px;
+  border: 2px solid #EF4444;
+  border-radius: 50%;
+  animation: voicePulseRing 1.5s ease-out infinite;
+  pointer-events: none;
+}
+
+/* Mic button smooth transition */
+.voice-mic-btn {
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.voice-mic-btn:hover {
+  transform: scale(1.05);
+}
+.voice-mic-btn:active {
+  transform: scale(0.95);
+}
+
+/* Language toggle chip */
+.voice-lang-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid;
+  user-select: none;
+}
+.voice-lang-chip.active {
+  background: rgba(232, 127, 51, 0.12);
+  border-color: rgba(232, 127, 51, 0.3);
+  color: var(--color-peach-600);
+}
+.voice-lang-chip.inactive {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.08);
+  color: var(--color-sage-500);
+}
+.voice-lang-chip:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+/* Recording status toast */
+@keyframes toastSlideIn {
+  from { opacity: 0; transform: translateY(-8px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.voice-toast {
+  animation: toastSlideIn 0.25s ease-out forwards;
 }

@@ -16,6 +16,7 @@ Tables:
 """
 
 import uuid
+from typing import Optional
 from datetime import datetime, timezone
 
 from sqlalchemy import (
@@ -87,6 +88,14 @@ class User(Base):
     patient_profile = relationship("Patient", back_populates="user", uselist=False)
     doctor_profile = relationship("Doctor", back_populates="user", uselist=False)
 
+    @property
+    def city(self) -> Optional[str]:
+        if self.role == "patient" and self.patient_profile:
+            return self.patient_profile.city
+        elif self.role == "doctor" and self.doctor_profile:
+            return self.doctor_profile.city
+        return None
+
 
 # ── Patient ──────────────────────────────────────────────────
 
@@ -107,6 +116,8 @@ class Patient(Base):
     chronic_conditions = Column(JSON, default=list)  # list of strings
     emergency_contact_name = Column(String, nullable=True)
     emergency_contact_phone = Column(EncryptedString, nullable=True)
+    last_risk_score = Column(Integer, nullable=True)
+    last_risk_band = Column(String, nullable=True)  # "low", "moderate", "high"
     created_at = Column(DateTime, default=utcnow)
 
     # Relationships
@@ -234,6 +245,20 @@ class SurveillanceReport(Base):
     alert_level = Column(SAEnum("normal", "watch", "warning", "critical", name="alert_level"), default="normal")
     details = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=utcnow)
+
+
+class OutbreakSnapshot(Base):
+    __tablename__ = "outbreak_snapshots"
+
+    id = Column(String, primary_key=True, default=new_uuid)
+    region = Column(String, nullable=False, index=True)
+    latitude = Column(Float, nullable=False)
+    longitude = Column(Float, nullable=False)
+    symptom_category = Column(String, nullable=False)
+    probability = Column(Float, nullable=False)  # 0.0 – 1.0 representing probability
+    case_count = Column(Integer, default=0)
+    timestamp = Column(DateTime, default=utcnow, index=True)
+
 
 
 # ── IoT Dispenser ────────────────────────────────────────────

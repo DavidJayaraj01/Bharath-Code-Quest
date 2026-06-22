@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api/client';
 import { ArrowLeft, Send, Loader2, AlertTriangle, CheckCircle2, Pill, Smartphone } from 'lucide-react';
 import type { Conversation, Patient, VitalReading, MedicationItem } from '../types';
+import RiskScoreGauge from '../components/passport/RiskScoreGauge';
 
 export default function DoctorCase() {
   const { conversationId } = useParams();
@@ -19,6 +20,7 @@ export default function DoctorCase() {
   const [rxSuccess, setRxSuccess] = useState(false);
   const [reportSending, setReportSending] = useState(false);
   const [reportMsg, setReportMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [riskData, setRiskData] = useState<{ score: number; band: 'low' | 'moderate' | 'high'; signals: string[] } | null>(null);
 
   useEffect(() => {
     if (!conversationId) return;
@@ -28,13 +30,39 @@ export default function DoctorCase() {
       return Promise.all([
         api.get(`/doctor/patients/${r.data.patient_id}`),
         api.get(`/doctor/patients/${r.data.patient_id}/vitals`),
+        api.get(`/risk/${r.data.patient_id}`),
       ]);
-    }).then(([p, v]) => {
+    }).then(([p, v, risk]) => {
       setPatient(p.data);
       setVitals(v.data);
+      setRiskData(risk.data);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [conversationId]);
+
+  // Connect to risk score websocket for real-time risk updates
+  useEffect(() => {
+    if (!patient) return;
+    const token = localStorage.getItem('token'); // doctor auth token
+    if (!token) return;
+    
+    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const host = window.location.hostname === 'localhost' ? 'localhost:8000' : window.location.host;
+    const ws = new WebSocket(`${protocol}://${host}/api/risk/ws/${patient.id}?token=${token}`);
+
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'risk_update') {
+        setRiskData({
+          score: data.score,
+          band: data.band,
+          signals: data.signals,
+        });
+      }
+    };
+
+    return () => { ws.close(); };
+  }, [patient?.id]);
 
   const addMed = () => setMeds(prev => [...prev, { name: '', dosage: '', frequency: '', duration: '' }]);
   const updateMed = (i: number, field: keyof MedicationItem, value: string) => {
@@ -187,6 +215,14 @@ export default function DoctorCase() {
 
         {/* Patient Info Sidebar */}
         <div className="space-y-4">
+          {riskData && (
+            <RiskScoreGauge
+              score={riskData.score}
+              band={riskData.band}
+              signals={riskData.signals}
+            />
+          )}
+
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
             <h3 className="font-semibold text-navy-900 mb-3">Patient Profile</h3>
             {patient && (

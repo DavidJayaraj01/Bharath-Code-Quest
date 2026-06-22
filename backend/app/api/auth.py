@@ -131,7 +131,7 @@ def register(req: RegisterWithPhoneRequest, db: Session = Depends(get_db)):
     if req.role == "patient":
         db.add(Patient(user_id=user.id, phone=normalized_phone, city=req.city))
     elif req.role == "doctor":
-        db.add(Doctor(user_id=user.id, specialty="General Medicine"))
+        db.add(Doctor(user_id=user.id, specialty="General Medicine", city=req.city))
 
     db.commit()
     db.refresh(user)

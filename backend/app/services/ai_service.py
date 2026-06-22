@@ -19,7 +19,7 @@ Bridge the healthcare access gap for India's 600M+ underserved citizens by provi
 
 SUPPORTED LANGUAGES:
 You MUST respond in the same language the patient uses. You fluently support:
-- English
+- English   
 - Hindi (हिन्दी)
 - Tamil (தமிழ்)
 - Telugu (తెలుగు)
@@ -93,28 +93,65 @@ _LOW_KEYWORDS = [
     "constipation", "dry skin", "dandruff",
 ]
 
-_FOLLOW_UP_QUESTIONS = {
+def _detect_lang(text: str) -> str:
+    # Check for Devanagari character range (Hindi)
+    if any('\u0900' <= char <= '\u097f' for char in text):
+        return "hi"
+    try:
+        from langdetect import detect
+        lang = detect(text)
+        if lang in ["hi", "mr", "ne", "bh"]:
+            return "hi"
+    except Exception:
+        pass
+    return "en"
+
+
+_FOLLOW_UP_QUESTIONS_EN = {
     "fever": [
-        "How long have you had the fever? Have you measured your temperature? Do you have any other symptoms like chills, body aches, or rash?",
-        "Is the fever continuous or does it come and go? Are you able to drink fluids? Any recent travel to a malaria-prone area?",
+        "How many days have you had this fever? Do you have any other symptoms like a cough, chills, body pain, or skin rash?",
+        "Is the fever continuous or coming and going? How many days has it been? Are you experiencing other symptoms like a sore throat or cough?",
     ],
     "headache": [
-        "Where exactly is the pain — forehead, back of the head, or one side? Is it throbbing or a dull ache? Any fever, nausea, or sensitivity to light?",
-        "How severe is the pain on a scale of 1–10? Is this a new kind of headache, or something you've experienced before?",
+        "How many days has the headache lasted? Is it accompanied by other symptoms like vomiting, neck stiffness, or a cough?",
+        "How severe is the headache, and for how many days? Do you have any associated symptoms like fever or vision changes?",
     ],
     "chest": [
-        "Can you describe the chest pain? Is it sharp, squeezing, or burning? Does it spread to your arm, neck, or jaw? Any shortness of breath or sweating?",
+        "How many days or hours have you felt this chest pain? Does it spread to your arm/jaw, and do you have a cough or breathing difficulty?",
     ],
     "stomach": [
-        "Where exactly is the pain — upper, lower, or all over? Did it start suddenly or gradually? Any vomiting, loose stools, or blood?",
+        "How many days have you had stomach pain? Is it accompanied by nausea, vomiting, diarrhea, or a fever?",
     ],
     "cough": [
-        "How long have you been coughing? Is there any phlegm — and if so, what color? Any fever or difficulty breathing?",
+        "How many days have you been coughing? Do you have other symptoms like a fever, chest pain, or difficulty breathing?",
     ],
     "default": [
-        "Can you tell me more about when these symptoms started and how severe they are? Are you able to go about your daily activities?",
-        "Have you had these symptoms before? Are you currently taking any medications?",
-        "Are there any other symptoms you are experiencing? Does anything make it better or worse?",
+        "How many days have you been experiencing these symptoms? What other symptoms do you have, such as a cough, fever, or body ache?",
+        "How long have you had this condition (in days), and what other symptoms are you experiencing?",
+    ],
+}
+
+_FOLLOW_UP_QUESTIONS_HI = {
+    "fever": [
+        "आपको यह बुखार कितने दिनों से है? क्या आपको खांसी, ठंड लगना, बदन दर्द या त्वचा पर लाल चकत्ते जैसे लक्षण हैं?",
+        "क्या बुखार लगातार रहता है या आता-जाता रहता है? कितने दिन हो गए हैं? क्या आपको गले में खराश या खांसी जैसे अन्य लक्षण हैं?",
+    ],
+    "headache": [
+        "सिरदर्द कितने दिनों से है? क्या इसके साथ उल्टी, गर्दन में अकड़न या खांसी जैसे अन्य लक्षण भी हैं?",
+        "सिरदर्द कितना गंभीर है और कितने दिनों से है? क्या आपको बुखार या आँखों के सामने अंधेरा छाने जैसे लक्षण हैं?",
+    ],
+    "chest": [
+        "आपको छाती में दर्द कितने दिनों या घंटों से महसूस हो रहा है? क्या यह दर्द आपके हाथ/जबड़े तक जाता है, और क्या आपको खांसी या सांस लेने में कठिनाई है?",
+    ],
+    "stomach": [
+        "आपको पेट दर्द कितने दिनों से है? क्या इसके साथ मतली, उल्टी, दस्त या बुखार है?",
+    ],
+    "cough": [
+        "आपको खांसी कितने दिनों से है? क्या आपको बुखार, छाती में दर्द या सांस लेने में कठिनाई जैसे अन्य लक्षण हैं?",
+    ],
+    "default": [
+        "आप इन लक्षणों को कितने दिनों से अनुभव कर रहे हैं? आपको और क्या लक्षण हैं, जैसे खांसी, बुखार या बदन दर्द?",
+        "आपको यह समस्या कितने दिनों से है, और आप इसके साथ और क्या लक्षण महसूस कर रहे हैं?",
     ],
 }
 
@@ -133,7 +170,9 @@ I am escalating your case to a VitalBridge doctor who will review it within minu
 
 **Go to the nearest PHC (Primary Health Centre), CHC, or District Hospital immediately. Do not delay.**
 
-_Remember: I am an AI assistant, not a replacement for emergency medical care. Please seek help now._""",
+_Remember: I am an AI assistant, not a replacement for emergency medical care. Please seek help now._
+
+📢 *WhatsApp Notification:* A copy of this triage report has been sent to your registered WhatsApp. Thank you!""",
 
     "medium": """Based on what you've shared, here's my assessment:
 
@@ -151,7 +190,9 @@ _Remember: I am an AI assistant, not a replacement for emergency medical care. P
 - Breathing becomes difficult
 - Symptoms worsen rapidly
 
-_A VitalBridge doctor has been notified and may follow up with you. I'm an AI assistant — please consult a doctor for a definitive diagnosis._""",
+_A VitalBridge doctor has been notified and may follow up with you. I'm an AI assistant — please consult a doctor for a definitive diagnosis._
+
+📢 *WhatsApp Notification:* A copy of this triage report has been sent to your registered WhatsApp. Thank you!""",
 
     "low": """Based on what you've described, here's my assessment:
 
@@ -169,7 +210,69 @@ _A VitalBridge doctor has been notified and may follow up with you. I'm an AI as
 - New symptoms develop
 - You feel your condition is worsening
 
-_I'm an AI assistant providing initial guidance. Always consult a qualified doctor for proper diagnosis and treatment._"""
+_I'm an AI assistant providing initial guidance. Always consult a qualified doctor for proper diagnosis and treatment._
+
+📢 *WhatsApp Notification:* A copy of this triage report has been sent to your registered WhatsApp. Thank you!"""
+}
+
+_SEVERITY_RESPONSES_HI = {
+    "high": """मैं आपके लक्षणों को लेकर चिंतित हूँ और चाहता हूँ कि आपको तुरंत सही इलाज मिले।
+
+**गंभीरता: उच्च (HIGH)** — आपके लक्षणों को तत्काल चिकित्सा सहायता की आवश्यकता है।
+
+⚠️ **कृपया अभी निम्नलिखित काम करें:**
+1. आपातकालीन सेवाओं को कॉल करें: **112** (भारत आपातकालीन सेवा) या किसी से आपको तुरंत निकटतम अस्पताल ले जाने के लिए कहें।
+2. डॉक्टर द्वारा जांच किए जाने तक कुछ भी न खाएं और न पीएं।
+3. शांत रहें और आरामदायक स्थिति में आराम करने की कोशिश करें।
+4. यदि कोई आपके साथ है, तो उन्हें अकेला न छोड़ें।
+
+मैं आपका मामला एक वाइटलब्रिज (VitalBridge) डॉक्टर को भेज रहा हूँ जो कुछ ही मिनटों में इसकी समीक्षा करेंगे।
+
+**तुरंत निकटतम पीएचसी (प्राथमिक स्वास्थ्य केंद्र), सीएचसी (सामुदायिक स्वास्थ्य केंद्र), या जिला अस्पताल जाएं। देरी न करें।**
+
+_याद रखें: मैं एक एआई (AI) सहायक हूँ, आपातकालीन चिकित्सा देखभाल का विकल्प नहीं। कृपया अभी सहायता लें।_
+
+📢 *व्हाट्सएप अधिसूचना:* इस रिपोर्ट की एक प्रति आपके पंजीकृत व्हाट्सएप नंबर पर भेज दी गई है। हमारे डॉक्टर जल्द ही आपसे संपर्क करेंगे। धन्यवाद!""",
+
+    "medium": """आपके द्वारा साझा की गई जानकारी के आधार पर, यहाँ मेरा मूल्यांकन है:
+
+**गंभीरता: मध्यम (MEDIUM)** — आपके लक्षणों पर ध्यान देने और निगरानी रखने की आवश्यकता है, लेकिन ये तुरंत जीवन के लिए खतरा नहीं हैं।
+
+**क्या करें:**
+- आराम करें और अच्छी तरह से हाइड्रेटेड रहें (यदि आवश्यक हो तो ओआरएस/नारियल पानी लें)।
+- अगले 12-24 घंटों में अपने लक्षणों पर बारीकी से नजर रखें।
+- पैकेजिंग पर दिए गए निर्देशानुसार बुखार/दर्द के लिए पैरासिटामोल लें (सिफारिश की गई खुराक से अधिक न लें)।
+- यदि लक्षण बिगड़ते हैं या 2 दिनों के भीतर सुधार नहीं होता है, तो अपने निकटतम पीएचसी या आशा (ASHA) कार्यकर्ता से मिलें।
+
+**⚠️ तत्काल देखभाल लें (पीएचसी जाएं/112 पर कॉल करें) यदि:**
+- बुखार 103°F (39.4°C) से अधिक हो जाता है या इसके साथ भ्रम/गर्दन में अकड़न होती है।
+- आपको कहीं भी खून दिखाई देता है (पेशाब, मल, उल्टी)।
+- सांस लेने में कठिनाई होती है।
+- स्थिति तेजी से बिगड़ती है।
+
+_एक वाइटलब्रिज डॉक्टर को सूचित कर दिया गया है और वे आपसे संपर्क कर सकते हैं। मैं एक एआई सहायक हूँ — निश्चित निदान के लिए कृपया डॉक्टर से परामर्श लें।_
+
+📢 *व्हाट्सएप अधिसूचना:* इस रिपोर्ट की एक प्रति आपके पंजीकृत व्हाट्सएप नंबर पर भेज दी गई है। धन्यवाद!""",
+
+    "low": """आपके द्वारा बताए गए लक्षणों के आधार पर, यहाँ मेरा मूल्यांकन है:
+
+**गंभीरता: निम्न (LOW)** — आपके लक्षण हल्के प्रतीत होते हैं और इनका प्रबंधन घर पर किया जा सकता है।
+
+**घरेलू देखभाल के उपाय:**
+- अच्छी तरह से आराम करें और पर्याप्त पानी पीएं (रोजाना 8-10 गिलास पानी)।
+- हल्का, आसानी से पचने वाला भोजन करें।
+- हल्के बुखार/दर्द के लिए: निर्देशानुसार पैरासिटामोल लें।
+- सर्दी/जुकाम के लिए: भाप लें, गर्म तरल पदार्थ पीएं, शहद-अदरक की चाय लें।
+
+**✅ आपको 3-5 दिनों में बेहतर महसूस होना चाहिए। हालांकि, अपने निकटतम पीएचसी पर जाएं यदि:**
+- लक्षण 5 दिनों के बाद भी बने रहते हैं।
+- बुखार 101°F से ऊपर बढ़ जाता है।
+- नए लक्षण विकसित होते हैं            
+- आपको लगता है कि आपकी स्थिति बिगड़ रही है।
+
+_मैं प्रारंभिक मार्गदर्शन प्रदान करने वाला एक एआई सहायक हूँ। उचित निदान और उपचार के लिए हमेशा योग्य डॉक्टर से परामर्श करें।_
+
+📢 *व्हाट्सएप अधिसूचना:* इस रिपोर्ट की एक प्रति आपके पंजीकृत व्हाट्सएप नंबर पर भेज दी गई है। धन्यवाद!"""
 }
 
 
@@ -205,15 +308,30 @@ def _build_fallback_response(conversation_history: List[dict], patient_context: 
     Smart rule-based fallback triage response.
     Analyses the conversation history and generates a contextual response.
     """
-    # Count patient messages
     patient_messages = [m for m in conversation_history if m["role"] == "patient"]
     num_turns = len(patient_messages)
 
+    # Combine all patient messages for analysis
+    all_patient_text = " ".join(m["content"] for m in patient_messages)
+    lang = _detect_lang(all_patient_text or "hello")
+
     if not patient_messages:
-        greeting = "Namaste! 🙏 I'm VitalBridge AI, your medical triage assistant."
-        if patient_context and patient_context.get("name"):
-            greeting = f"Namaste {patient_context['name']}! 🙏 I'm VitalBridge AI, your medical triage assistant."
-        return f"""{greeting}
+        if lang == "hi":
+            greeting = "नमस्ते! 🙏 मैं वाइटलब्रिज एआई (VitalBridge AI) हूँ, आपका चिकित्सा मूल्यांकन सहायक।"
+            if patient_context and patient_context.get("name"):
+                greeting = f"नमस्ते {patient_context['name']}! 🙏 मैं वाइटलब्रिज एआई हूँ।"
+            return f"""{greeting}
+
+मैं यहाँ आपके लक्षणों का मूल्यांकन करने और आपके स्वास्थ्य सेवा के अगले चरणों में मार्गदर्शन करने के लिए हूँ।
+
+कृपया मुझे बताएं: **आज आप किन लक्षणों का अनुभव कर रहे हैं?**
+
+आप अपने लक्षणों का वर्णन अंग्रेजी, हिंदी (हिंदी), तमिल, तेलुगु, कन्नड़ या बंगाली में कर सकते हैं — मैं इन सभी को समझता हूँ।"""
+        else:
+            greeting = "Namaste! 🙏 I'm VitalBridge AI, your medical triage assistant."
+            if patient_context and patient_context.get("name"):
+                greeting = f"Namaste {patient_context['name']}! 🙏 I'm VitalBridge AI, your medical triage assistant."
+            return f"""{greeting}
 
 I'm here to help assess your symptoms and guide you on the next steps for your healthcare.
 
@@ -224,41 +342,50 @@ You can describe your symptoms in English, Hindi (हिंदी), Tamil, Telug
     # Get last patient message
     last_patient_msg = patient_messages[-1]["content"].lower()
 
-    # Combine all patient messages for analysis
-    all_patient_text = " ".join(m["content"] for m in patient_messages)
-
     # Detect severity
     severity = _detect_severity_from_text(all_patient_text)
 
     # First message — ask follow-up questions
     if num_turns == 1:
         topic = _get_topic(last_patient_msg)
-        questions = _FOLLOW_UP_QUESTIONS.get(topic, _FOLLOW_UP_QUESTIONS["default"])
-        question = random.choice(questions)
+        
+        if lang == "hi":
+            questions = _FOLLOW_UP_QUESTIONS_HI.get(topic, _FOLLOW_UP_QUESTIONS_HI["default"])
+            question = random.choice(questions)
+            intro = "मुझसे यह साझा करने के लिए धन्यवाद। मैं यह सुनिश्चित करना चाहता हूँ कि मैं आपकी स्थिति को पूरी तरह से समझूँ।"
+            if patient_context and patient_context.get("conditions"):
+                conditions = ", ".join(patient_context["conditions"])
+                intro += f" मैं आपके स्वास्थ्य रिकॉर्ड से देख सकता हूँ कि आपका {conditions} का इतिहास रहा है।"
+            return f"""{intro}
 
-        intro = "Thank you for sharing that with me. I want to make sure I understand your situation fully."
-
-        # Add patient context personalization
-        if patient_context:
-            if patient_context.get("conditions"):
+{question}"""
+        else:
+            questions = _FOLLOW_UP_QUESTIONS_EN.get(topic, _FOLLOW_UP_QUESTIONS_EN["default"])
+            question = random.choice(questions)
+            intro = "Thank you for sharing that with me. I want to make sure I understand your situation fully."
+            if patient_context and patient_context.get("conditions"):
                 conditions = ", ".join(patient_context["conditions"])
                 intro += f" I can see from your health record that you have a history of {conditions}, which I'll keep in mind."
+            return f"""{intro}
 
-        return f"""{intro}
-
-{question}
-
-Also: **How long have you been experiencing these symptoms?**"""
+{question}"""
 
     # Second message — assess and possibly escalate
     if num_turns == 2:
-        # If high severity, escalate immediately
         if severity == "high":
-            return _SEVERITY_RESPONSES["high"]
+            return _SEVERITY_RESPONSES_HI["high"] if lang == "hi" else _SEVERITY_RESPONSES["high"]
 
         topic = _get_topic(all_patient_text)
-        # Ask one more clarifying question before final assessment
-        return f"""Thank you for that additional information. Let me ask a couple more things to complete my assessment:
+        if lang == "hi":
+            return f"""अतिरिक्त जानकारी के लिए धन्यवाद। मेरा मूल्यांकन पूरा करने के लिए मुझे कुछ बातें और पूछने दें:
+
+1. **क्या आप अपनी दैनिक गतिविधियाँ करने में सक्षम हैं**, या लक्षण आपको महत्वपूर्ण रूप से सीमित कर रहे हैं?
+2. **क्या आपने इस स्थिति के लिए पहले से ही कोई दवा ली है**?
+3. क्या आपको इनमें से कोई लक्षण हैं? सांस लेने में कठिनाई, गंभीर दर्द, 102°F (39°C) से ऊपर तेज बुखार, या कहीं भी खून आना?
+
+_अब तक आपने जो बताया है, उसके आधार पर मैं इसे एक संभावित **{severity.upper()}** गंभीरता का मामला मान रहा हूँ, लेकिन अंतिम मार्गदर्शन देने से पहले मुझे पुष्टि करने दें।_"""
+        else:
+            return f"""Thank you for that additional information. Let me ask a couple more things to complete my assessment:
 
 1. **Are you able to perform your daily activities**, or are the symptoms significantly limiting you?
 2. **Have you taken any medications** for this condition already?
@@ -268,11 +395,11 @@ _Based on what you've told me so far, I'm considering this a potential **{severi
 
     # Third+ message — give final assessment
     if severity == "high":
-        return _SEVERITY_RESPONSES["high"]
+        return _SEVERITY_RESPONSES_HI["high"] if lang == "hi" else _SEVERITY_RESPONSES["high"]
     elif severity == "medium":
-        return _SEVERITY_RESPONSES["medium"]
+        return _SEVERITY_RESPONSES_HI["medium"] if lang == "hi" else _SEVERITY_RESPONSES["medium"]
     else:
-        return _SEVERITY_RESPONSES["low"]
+        return _SEVERITY_RESPONSES_HI["low"] if lang == "hi" else _SEVERITY_RESPONSES["low"]
 
 
 # ─────────────────────────────────────────────
@@ -282,6 +409,15 @@ _Based on what you've told me so far, I'm considering this a potential **{severi
 def build_messages(conversation_history: List[dict], patient_context: Optional[dict] = None) -> list:
     """Build the messages array for the LLM call."""
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+
+    # Language detection for Grok prompting
+    all_text = " ".join(m["content"] for m in conversation_history if m["role"] == "patient")
+    detected_lang = _detect_lang(all_text)
+    if detected_lang == "hi":
+        messages.append({
+            "role": "system",
+            "content": "CRITICAL: The patient has written in Hindi. You MUST respond completely in Hindi using Devanagari script. Keep your tone empathetic and clear."
+        })
 
     if patient_context:
         context_str = f"""Patient Context (use this to inform your assessment):

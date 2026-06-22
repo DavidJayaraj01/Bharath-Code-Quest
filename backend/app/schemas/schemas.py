@@ -61,6 +61,7 @@ class UserOut(BaseModel):
     role: UserRole
     is_active: bool
     created_at: datetime
+    city: Optional[str] = None
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -80,6 +81,8 @@ class PatientOut(BaseModel):
     blood_group: Optional[str] = None
     allergies: List[str] = []
     chronic_conditions: List[str] = []
+    last_risk_score: Optional[int] = None
+    last_risk_band: Optional[str] = None
 
 class PatientUpdate(BaseModel):
     gender: Optional[str] = None
@@ -235,3 +238,7 @@ class DoctorQueueItem(BaseModel):
     severity: SeverityLevel
     created_at: datetime
     ai_summary: Optional[str] = None
+    last_risk_score: Optional[int] = None
+    last_risk_band: Optional[str] = None
+    patient_city: Optional[str] = None
+

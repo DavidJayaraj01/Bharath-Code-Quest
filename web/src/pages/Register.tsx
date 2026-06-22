@@ -1,9 +1,71 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import api from '../api/client';
-import { Shield, Loader2, AlertCircle, Heart, Activity, Eye, EyeOff, Phone, CheckCircle2, ArrowRight, ArrowLeft, User, Mail, Lock, Smartphone } from 'lucide-react';
+import { Loader2, AlertCircle, Heart, Activity, Eye, EyeOff, Phone, CheckCircle2, ArrowRight, ArrowLeft, User, Mail, Lock, Smartphone } from 'lucide-react';
+import logoImg from '../assets/logo.png';
 import type { TokenResponse } from '../types';
+import { MapContainer, TileLayer, CircleMarker, Popup, useMap, useMapEvents } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+
+const INDIAN_CITIES = [
+  { name: 'Mumbai', state: 'Maharashtra', lat: 19.0760, lng: 72.8777 },
+  { name: 'Delhi', state: 'Delhi', lat: 28.7041, lng: 77.1025 },
+  { name: 'Bengaluru', state: 'Karnataka', lat: 12.9716, lng: 77.5946 },
+  { name: 'Chennai', state: 'Tamil Nadu', lat: 13.0827, lng: 80.2707 },
+  { name: 'Hyderabad', state: 'Telangana', lat: 17.3850, lng: 78.4867 },
+  { name: 'Kolkata', state: 'West Bengal', lat: 22.5726, lng: 88.3639 },
+  { name: 'Pune', state: 'Maharashtra', lat: 18.5204, lng: 73.8567 },
+  { name: 'Jaipur', state: 'Rajasthan', lat: 26.9124, lng: 75.7873 },
+  { name: 'Ahmedabad', state: 'Gujarat', lat: 23.0225, lng: 72.5714 },
+  { name: 'Lucknow', state: 'Uttar Pradesh', lat: 26.8467, lng: 80.9462 },
+  { name: 'Patna', state: 'Bihar', lat: 25.5941, lng: 85.1376 },
+  { name: 'Bhopal', state: 'Madhya Pradesh', lat: 23.2599, lng: 77.4126 },
+  { name: 'Guwahati', state: 'Assam', lat: 26.1445, lng: 91.7362 },
+  { name: 'Kochi', state: 'Kerala', lat: 9.9312, lng: 76.2673 },
+  { name: 'Srinagar', state: 'Jammu & Kashmir', lat: 34.0837, lng: 74.7973 },
+  { name: 'Visakhapatnam', state: 'Andhra Pradesh', lat: 17.6868, lng: 83.2185 },
+  { name: 'Chandigarh', state: 'Punjab', lat: 30.7333, lng: 76.7794 },
+  { name: 'Dehradun', state: 'Uttarakhand', lat: 30.3165, lng: 78.0322 },
+  { name: 'Shimla', state: 'Himachal Pradesh', lat: 31.1048, lng: 77.1734 },
+  { name: 'Bhubaneswar', state: 'Odisha', lat: 20.2961, lng: 85.8245 },
+  { name: 'Raipur', state: 'Chhattisgarh', lat: 21.2514, lng: 81.6296 },
+  { name: 'Ranchi', state: 'Jharkhand', lat: 23.3441, lng: 85.3096 },
+  { name: 'Panaji', state: 'Goa', lat: 15.4909, lng: 73.8278 },
+  { name: 'Thiruvananthapuram', state: 'Kerala', lat: 8.5241, lng: 76.9366 },
+];
+
+function MapResizeInvalidator() {
+  const map = useMap();
+  useEffect(() => {
+    const handleResize = () => {
+      setTimeout(() => {
+        map.invalidateSize();
+      }, 200);
+    };
+    window.addEventListener('resize', handleResize);
+    handleResize();
+    return () => window.removeEventListener('resize', handleResize);
+  }, [map]);
+  return null;
+}
+
+function MapPanToSelected({ center }: { center: [number, number] }) {
+  const map = useMap();
+  useEffect(() => {
+    map.setView(center, map.getZoom() > 5 ? map.getZoom() : 6, { animate: true });
+  }, [center, map]);
+  return null;
+}
+
+function MapClickHandler({ onMapClick }: { onMapClick: (lat: number, lng: number) => void }) {
+  useMapEvents({
+    click(e) {
+      onMapClick(e.latlng.lat, e.latlng.lng);
+    },
+  });
+  return null;
+}
 
 type Step = 'details' | 'phone' | 'otp';
 
@@ -26,6 +88,7 @@ export default function Register() {
   const [otpLoading, setOtpLoading] = useState(false);
   const [otpError, setOtpError] = useState('');
   const [otpCountdown, setOtpCountdown] = useState(0);
+  const [otpSuccessMessage, setOtpSuccessMessage] = useState('');
 
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -40,10 +103,12 @@ export default function Register() {
     }
     setOtpError('');
     setOtpLoading(true);
+    setOtpSuccessMessage('');
     try {
       const { data } = await api.post('/auth/otp/send', { phone: phone.trim() });
       if (data.success) {
         setStep('otp');
+        setOtpSuccessMessage(data.message || '');
         // Start countdown
         setOtpCountdown(60);
         const interval = setInterval(() => {
@@ -55,6 +120,14 @@ export default function Register() {
             return prev - 1;
           });
         }, 1000);
+
+        // Bypassed/Fallback mode (unverified trial number)
+        if (data.message && data.message.includes('Use code:')) {
+          const match = data.message.match(/Use code:\s*(\d+)/);
+          if (match) {
+            setOtp(match[match.length - 1]);
+          }
+        }
       } else {
         setOtpError(data.message || 'Failed to send OTP');
       }
@@ -98,7 +171,7 @@ export default function Register() {
         password,
         full_name: fullName,
         role,
-        city: role === 'patient' ? city : undefined,
+        city: city || undefined,
       };
       if (phone.trim() && otpVerified) {
         payload.phone = phone.trim();
@@ -114,7 +187,7 @@ export default function Register() {
     }
   };
 
-  const canProceedToPhone = fullName.trim() && email.trim() && password.length >= 6 && (role !== 'patient' || city);
+  const canProceedToPhone = fullName.trim() && email.trim() && password.length >= 6 && city;
 
   const renderStep = () => {
     switch (step) {
@@ -196,7 +269,6 @@ export default function Register() {
                     type="button"
                     onClick={() => {
                       setRole(r.value);
-                      if (r.value !== 'patient') setCity('');
                     }}
                     className={`flex-1 py-3 px-4 rounded-xl border text-left transition-all duration-300 ${
                       role === r.value
@@ -211,31 +283,88 @@ export default function Register() {
               </div>
             </div>
 
-            {role === 'patient' && (
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-slate-300">
-                  Select Location (City)
-                </label>
-                <select
-                  id="register-city"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  required
-                  className="login-input w-full bg-slate-950/50 text-white rounded-xl border border-white/10 px-3 py-3 text-sm outline-none focus:border-peach-500/50"
-                  style={{ colorScheme: 'dark' }}
-                >
-                  <option value="" disabled className="bg-slate-900 text-slate-400">Select city...</option>
-                  <option value="Chennai" className="bg-slate-900 text-white">Chennai (Tamil Nadu)</option>
-                  <option value="Mumbai" className="bg-slate-900 text-white">Mumbai (Maharashtra)</option>
-                  <option value="Delhi" className="bg-slate-900 text-white">Delhi (NCR)</option>
-                  <option value="Bengaluru" className="bg-slate-900 text-white">Bengaluru (Karnataka)</option>
-                  <option value="Hyderabad" className="bg-slate-900 text-white">Hyderabad (Telangana)</option>
-                  <option value="Kolkata" className="bg-slate-900 text-white">Kolkata (West Bengal)</option>
-                  <option value="Pune" className="bg-slate-900 text-white">Pune (Maharashtra)</option>
-                  <option value="Jaipur" className="bg-slate-900 text-white">Jaipur (Rajasthan)</option>
-                </select>
-              </div>
-            )}
+            {(role === 'patient' || role === 'doctor') && (() => {
+              const selectedCityObj = INDIAN_CITIES.find(c => c.name === city);
+              const selectedCityCoords: [number, number] = selectedCityObj 
+                ? [selectedCityObj.lat, selectedCityObj.lng] 
+                : [20.5937, 78.9629];
+
+              const handleMapClick = (lat: number, lng: number) => {
+                let nearestCity = INDIAN_CITIES[0];
+                let minDistance = Infinity;
+                INDIAN_CITIES.forEach((c) => {
+                  const dist = Math.pow(c.lat - lat, 2) + Math.pow(c.lng - lng, 2);
+                  if (dist < minDistance) {
+                    minDistance = dist;
+                    nearestCity = c;
+                  }
+                });
+                setCity(nearestCity.name);
+              };
+
+              return (
+                <div className="space-y-3">
+                  <label className="block text-sm font-medium text-slate-300">
+                    Select Location (City)
+                  </label>
+                  <select
+                    id="register-city"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    required
+                    className="login-input w-full bg-slate-950/50 text-white rounded-xl border border-white/10 px-3 py-3 text-sm outline-none focus:border-peach-500/50"
+                    style={{ colorScheme: 'dark' }}
+                  >
+                    <option value="" disabled className="bg-slate-900 text-slate-400">Select city...</option>
+                    {INDIAN_CITIES.map((c) => (
+                      <option key={c.name} value={c.name} className="bg-slate-900 text-white">
+                        {c.name} ({c.state})
+                      </option>
+                    ))}
+                  </select>
+
+                  <div className="h-44 rounded-xl overflow-hidden border border-white/10 relative z-0">
+                    <MapContainer
+                      center={selectedCityCoords}
+                      zoom={4}
+                      className="h-full w-full"
+                      zoomControl={false}
+                    >
+                      <TileLayer
+                        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                        attribution='&copy; OpenStreetMap &copy; CARTO'
+                      />
+                      <MapPanToSelected center={selectedCityCoords} />
+                      <MapResizeInvalidator />
+                      <MapClickHandler onMapClick={handleMapClick} />
+                      
+                      {INDIAN_CITIES.map((c) => (
+                        <CircleMarker
+                          key={c.name}
+                          center={[c.lat, c.lng]}
+                          radius={city === c.name ? 8 : 4}
+                          fillColor={city === c.name ? '#FF9C5F' : '#6E8552'}
+                          color={city === c.name ? '#FF9C5F' : '#6E8552'}
+                          weight={city === c.name ? 3 : 1}
+                          fillOpacity={0.8}
+                          eventHandlers={{
+                            click: () => setCity(c.name),
+                          }}
+                        >
+                          <Popup>
+                            <div className="text-xs font-bold text-[#0D1B2A]">{c.name}</div>
+                            <div className="text-[10px] text-slate-500">{c.state}</div>
+                          </Popup>
+                        </CircleMarker>
+                      ))}
+                    </MapContainer>
+                  </div>
+                  <p className="text-[10px] text-slate-500 leading-normal">
+                    Tip: Click any marker or click anywhere on the India map to select the closest city.
+                  </p>
+                </div>
+              );
+            })()}
 
             <button
               type="button"
@@ -310,7 +439,7 @@ export default function Register() {
                   onClick={handleSendOtp}
                   disabled={otpLoading || phone.length !== 10}
                   className="px-5 py-3 rounded-xl font-semibold text-sm transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed"
-                  style={{ background: 'linear-gradient(135deg, #e87f33 0%, #c2641f 100%)', color: 'white' }}
+                  style={{ background: 'linear-gradient(135deg, #FF9C5F 0%, #C25B20 100%)', color: 'white' }}
                 >
                   {otpLoading ? <Loader2 size={18} className="animate-spin" /> : 'Send OTP'}
                 </button>
@@ -354,9 +483,20 @@ export default function Register() {
             <div className="flex items-start gap-3 p-4 rounded-xl bg-sage-500/10 border border-sage-500/20">
               <CheckCircle2 size={20} className="text-sage-400 shrink-0 mt-0.5" />
               <div>
-                <p className="text-sage-300 text-sm font-medium">OTP Sent Successfully!</p>
+                <p className="text-sage-300 text-sm font-medium">OTP Status</p>
                 <p className="text-slate-400 text-xs mt-1">
-                  A 6-digit code was sent to <span className="text-white font-medium">+91 {phone}</span> via SMS.
+                  {otpSuccessMessage ? (
+                    otpSuccessMessage.includes('Use code:') ? (
+                      <span>
+                        SMS delivery skipped (unverified number). Developer code auto-filled:{" "}
+                        <strong className="text-amber-400 font-bold">{otpSuccessMessage.match(/Use code:\s*(\d+)/)?.[1]}</strong>
+                      </span>
+                    ) : (
+                      otpSuccessMessage
+                    )
+                  ) : (
+                    `A 6-digit code was sent to +91 ${phone} via SMS.`
+                  )}
                 </p>
               </div>
             </div>
@@ -429,7 +569,7 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #111c14 0%, #1a2a1f 25%, #2a1f18 50%, #1a2a1f 75%, #111c14 100%)' }}>
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #130d0a 0%, #1c130d 25%, #2c1a11 50%, #1c130d 75%, #130d0a 100%)' }}>
       {/* Animated Background Orbs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="login-orb login-orb-1" />
@@ -437,7 +577,7 @@ export default function Register() {
         <div className="login-orb login-orb-3" />
         <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.8) 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
         <svg className="absolute bottom-0 left-0 w-full h-32 opacity-10" viewBox="0 0 1200 120" preserveAspectRatio="none">
-          <path d="M0,60 L200,60 L220,20 L240,100 L260,40 L280,80 L300,60 L500,60 L520,10 L540,110 L560,30 L580,90 L600,60 L800,60 L820,15 L840,105 L860,35 L880,85 L900,60 L1200,60" fill="none" stroke="#e87f33" strokeWidth="2" className="login-ecg-line" />
+          <path d="M0,60 L200,60 L220,20 L240,100 L260,40 L280,80 L300,60 L500,60 L520,10 L540,110 L560,30 L580,90 L600,60 L800,60 L820,15 L840,105 L860,35 L880,85 L900,60 L1200,60" fill="none" stroke="#FF9C5F" strokeWidth="2" className="login-ecg-line" />
         </svg>
       </div>
 
@@ -445,8 +585,8 @@ export default function Register() {
         {/* Logo */}
         <div className="text-center mb-8 login-float-in" style={{ animationDelay: '0.1s' }}>
           <div className="relative inline-block mb-5">
-            <div className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto shadow-2xl login-logo-glow" style={{ background: 'linear-gradient(135deg, #e87f33 0%, #3e7a2c 100%)' }}>
-              <Shield size={36} className="text-white drop-shadow-lg" />
+            <div className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto shadow-2xl login-logo-glow overflow-hidden bg-slate-950/80 p-3.5 border border-white/10">
+              <img src={logoImg} alt="VitalBridge Logo" className="object-contain w-full h-full" />
             </div>
             <div className="absolute inset-0 rounded-3xl login-pulse-ring" />
             <div className="absolute -top-2 -right-3 w-8 h-8 rounded-full bg-peach-500/20 flex items-center justify-center login-float-badge" style={{ animationDelay: '0s' }}>

@@ -1,6 +1,8 @@
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { MessageSquare, FileHeart, Stethoscope, Activity, LogOut, Shield } from 'lucide-react';
+import { MessageSquare, FileHeart, Stethoscope, Activity, LogOut, Heart, Pill, User, Settings } from 'lucide-react';
+import logoImg from '../assets/logo.png';
 
 const navItems: Record<string, { label: string; path: string; icon: React.ReactNode }[]> = {
   patient: [
@@ -22,6 +24,7 @@ const navItems: Record<string, { label: string; path: string; icon: React.ReactN
 export default function Layout() {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleLogout = () => {
     logout();
@@ -29,6 +32,46 @@ export default function Layout() {
   };
 
   const items = navItems[user?.role || 'patient'] || [];
+  const isPassportPage = location.pathname === '/passport';
+
+  const [activeSection, setActiveSection] = useState('');
+
+  const handleScrollToSection = (id: string) => {
+    if (isPassportPage) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth' });
+      }
+    } else {
+      navigate(`/passport#${id}`);
+    }
+  };
+
+  useEffect(() => {
+    if (!isPassportPage) {
+      setActiveSection('');
+      return;
+    }
+
+    const sections = ['vitals-section', 'medications-section', 'asha-section', 'settings-section'];
+    const observers = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setActiveSection(entry.target.id);
+          }
+        });
+      },
+      { rootMargin: '-20% 0px -60% 0px' }
+    );
+
+    sections.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) observers.observe(el);
+    });
+
+    return () => observers.disconnect();
+  }, [isPassportPage]);
 
   return (
     <div className="flex h-screen bg-slate-50 flex-col lg:flex-row">
@@ -37,8 +80,8 @@ export default function Layout() {
         {/* Logo */}
         <div className="px-6 py-5 border-b border-white/10">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-teal-500 flex items-center justify-center">
-              <Shield size={20} className="text-white" />
+            <div className="w-10 h-10 rounded-xl overflow-hidden bg-navy-950 flex items-center justify-center border border-white/10 shrink-0">
+              <img src={logoImg} alt="VitalBridge Logo" className="object-cover w-full h-full scale-125" />
             </div>
             <div>
               <h1 className="text-lg font-bold tracking-tight">VitalBridge</h1>
@@ -49,23 +92,70 @@ export default function Layout() {
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 space-y-1">
-          {items.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200
-                ${isActive
-                  ? 'bg-teal-500/20 text-teal-300'
-                  : 'text-slate-300 hover:bg-white/5 hover:text-white'
-                }`
-              }
-            >
-              {item.icon}
-              {item.label}
-            </NavLink>
-          ))}
+          {items.map((item) => {
+            const isPassport = item.path === '/passport';
+            return (
+              <div key={item.path} className="space-y-1">
+                <NavLink
+                  to={item.path}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200
+                    ${(isActive && !isPassportPage) || (isPassport && isPassportPage)
+                      ? 'bg-teal-500/20 text-teal-300'
+                      : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                    }`
+                  }
+                >
+                  {item.icon}
+                  {item.label}
+                </NavLink>
+
+                {isPassport && user?.role === 'patient' && (
+                  <div className="pl-6 space-y-1 py-1">
+                    <button
+                      onClick={() => handleScrollToSection('vitals-section')}
+                      className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium text-left transition-all
+                        ${activeSection === 'vitals-section' ? 'text-teal-300 font-semibold bg-white/5' : 'text-slate-400 hover:text-slate-200'}`}
+                    >
+                      <Heart size={14} />
+                      Vitals History
+                    </button>
+                    <button
+                      onClick={() => handleScrollToSection('medications-section')}
+                      className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium text-left transition-all
+                        ${activeSection === 'medications-section' ? 'text-teal-300 font-semibold bg-white/5' : 'text-slate-400 hover:text-slate-200'}`}
+                    >
+                      <Pill size={14} />
+                      Medications
+                    </button>
+                    <button
+                      onClick={() => handleScrollToSection('asha-section')}
+                      className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium text-left transition-all
+                        ${activeSection === 'asha-section' ? 'text-teal-300 font-semibold bg-white/5' : 'text-slate-400 hover:text-slate-200'}`}
+                    >
+                      <User size={14} />
+                      My ASHA Worker
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </nav>
+
+        {/* Settings button */}
+        {user?.role === 'patient' && (
+          <div className="px-3 py-2 border-t border-white/5">
+            <button
+              onClick={() => handleScrollToSection('settings-section')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-left
+                ${activeSection === 'settings-section' ? 'bg-teal-500/20 text-teal-300 font-semibold' : 'text-slate-300 hover:bg-white/5 hover:text-white'}`}
+            >
+              <Settings size={20} />
+              Settings
+            </button>
+          </div>
+        )}
 
         {/* User info */}
         <div className="px-4 py-4 border-t border-white/10">
@@ -121,3 +211,4 @@ export default function Layout() {
     </div>
   );
 }
+

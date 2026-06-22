@@ -153,6 +153,13 @@ async def send_message_sync(
     db.commit()
     db.refresh(ai_msg)
 
+    # Trigger risk score update and broadcast
+    try:
+        from app.services.risk_score_service import update_and_broadcast_risk_score
+        await update_and_broadcast_risk_score(patient.id, db)
+    except Exception as e:
+        print(f"[Risk Update Error] {e}")
+
     # Process surveillance clustering
     try:
         await process_surveillance_alert(conv.id, db)
@@ -279,7 +286,10 @@ async def triage_ws(websocket: WebSocket, conv_id: str):
                 db.add(ai_msg)
 
                 severity = extract_severity(full_response)
+                is_finalizing = False
                 if severity:
+                    if severity != "pending" and (conv.severity == "pending" or conv.severity is None):
+                        is_finalizing = True
                     conv.severity = severity
                     if severity == "high" and conv.status == "active":
                         conv.status = "escalated"
@@ -290,11 +300,48 @@ async def triage_ws(websocket: WebSocket, conv_id: str):
                             "patient_name": user.full_name,
                             "chief_complaint": conv.chief_complaint,
                             "severity": "high",
+                            "last_risk_score": patient.last_risk_score,
+                            "last_risk_band": patient.last_risk_band,
+                            "patient_city": patient.city if patient else (conv.region if conv else None),
                         })
 
                 conv.updated_at = datetime.now(timezone.utc)
                 db.commit()
                 db.refresh(ai_msg)
+
+                if is_finalizing:
+                    try:
+                        from app.services.communication import send_twilio_message
+                        if patient.phone:
+                            severity_emoji = {"low": "🟢", "medium": "🟡", "high": "🔴", "pending": "⏳"}
+                            emoji = severity_emoji.get(severity, "⏳")
+                            report_body = (
+                                f"📋 *VitalBridge Health Report Summary*\n"
+                                f"━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                                f"👤 *Patient:* {user.full_name}\n"
+                                f"📅 *Date:* {datetime.now().strftime('%d %b %Y, %I:%M %p')}\n"
+                                f"{emoji} *Severity:* {severity.upper()}\n\n"
+                            )
+                            if conv.chief_complaint:
+                                report_body += f"🩺 *Chief Complaint:*\n{conv.chief_complaint}\n\n"
+                            
+                            clean_response = full_response.split("📢 *WhatsApp Notification:")[0].split("📢 *व्हाट्सएप अधिसूचना:")[0].strip()
+                            report_body += f"🤖 *AI Assessment Summary:*\n{clean_response[:600]}...\n\n"
+                            report_body += (
+                                f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                                f"💊 Stay healthy! A copy of this report has been shared with our clinical team.\n"
+                                f"Thank you for using VitalBridge!"
+                            )
+                            send_twilio_message(to_phone=patient.phone, body=report_body, is_whatsapp=True)
+                            print(f"[Triage WS] Auto-sent final WhatsApp report to {patient.phone}")
+                    except Exception as whatsapp_err:
+                        print(f"[Triage WS] Auto WhatsApp report error: {whatsapp_err}")
+
+                try:
+                    from app.services.risk_score_service import update_and_broadcast_risk_score
+                    await update_and_broadcast_risk_score(patient.id, db)
+                except Exception as e:
+                    print(f"[Risk Update Error] {e}")
 
                 await safe_send({
                     "type": "ai_complete",
@@ -490,12 +537,24 @@ async def whatsapp_webhook(
             if severity == "high" and conv.status == "active":
                 conv.status = "escalated"
                 conv.ai_summary = ai_response[:500]
+                try:
+                    from app.services.risk_score_service import compute_risk_score
+                    risk_res = compute_risk_score(patient.id, db)
+                    last_risk_score = risk_res["score"]
+                    last_risk_band = risk_res["band"]
+                except Exception:
+                    last_risk_score = None
+                    last_risk_band = None
+
                 await manager.broadcast("doctor_queue", {
                     "type": "new_escalation",
                     "conversation_id": conv.id,
                     "patient_name": user.full_name if user else "WhatsApp Patient",
                     "chief_complaint": conv.chief_complaint,
                     "severity": "high",
+                    "last_risk_score": last_risk_score,
+                    "last_risk_band": last_risk_band,
+                    "patient_city": patient.city if patient else (conv.region if conv else None),
                 })
                 
         db.commit()

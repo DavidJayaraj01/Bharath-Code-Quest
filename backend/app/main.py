@@ -45,17 +45,24 @@ app.add_middleware(
 # ── Routers ──
 from app.api.auth import router as auth_router
 from app.api.triage import router as triage_router
-from app.api.passport import router as passport_router
+from app.api.passport import router as passport_router, hospitals_router
 from app.api.doctor import router as doctor_router
 from app.api.surveillance import router as surveillance_router
 from app.api.iot import router as iot_router
+from app.api.risk import router as risk_router
+from app.api.reports import router as reports_router
+from app.api.verify import router as verify_router
 
 app.include_router(auth_router)
 app.include_router(triage_router)
 app.include_router(passport_router)
+app.include_router(hospitals_router)
 app.include_router(doctor_router)
 app.include_router(surveillance_router)
 app.include_router(iot_router)
+app.include_router(risk_router)
+app.include_router(reports_router)
+app.include_router(verify_router)
 
 
 @app.get("/api/health")

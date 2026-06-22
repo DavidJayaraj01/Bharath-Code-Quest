@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import api from '../api/client';
-import { AlertTriangle, Clock, Stethoscope, Loader2, Users } from 'lucide-react';
+import { AlertTriangle, Clock, Stethoscope, Loader2, Users, MapPin, Filter } from 'lucide-react';
 import type { DoctorQueueItem } from '../types';
 
 const severityColors: Record<string, string> = {
@@ -13,10 +13,11 @@ const severityColors: Record<string, string> = {
 };
 
 export default function DoctorDashboard() {
-  const { token } = useAuthStore();
+  const { user, token } = useAuthStore();
   const navigate = useNavigate();
   const [queue, setQueue] = useState<DoctorQueueItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filterLocation, setFilterLocation] = useState<string>('all');
 
   // Load queue
   useEffect(() => {
@@ -42,11 +43,32 @@ export default function DoctorDashboard() {
           severity: data.severity,
           created_at: new Date().toISOString(),
           ai_summary: undefined,
+          last_risk_score: data.last_risk_score,
+          last_risk_band: data.last_risk_band,
+          patient_city: data.patient_city,
         }, ...prev]);
       }
     };
     return () => ws.close();
   }, [token]);
+
+  const doctorCity = user?.city || '';
+  const hasDoctorCity = !!doctorCity;
+  const isDoctorCityChennai = doctorCity.trim().toLowerCase() === 'chennai';
+
+  const chennaiCount = queue.filter(item => item.patient_city?.trim().toLowerCase() === 'chennai').length;
+  const myCityCount = doctorCity ? queue.filter(item => item.patient_city?.trim().toLowerCase() === doctorCity.trim().toLowerCase()).length : 0;
+
+  const filteredQueue = queue.filter(item => {
+    if (filterLocation === 'all') return true;
+    if (filterLocation === 'chennai') {
+      return item.patient_city?.trim().toLowerCase() === 'chennai';
+    }
+    if (filterLocation === 'my_city') {
+      return item.patient_city?.trim().toLowerCase() === doctorCity.trim().toLowerCase();
+    }
+    return true;
+  });
 
   return (
     <div className="p-6 max-w-5xl mx-auto animate-fade-in">
@@ -65,6 +87,52 @@ export default function DoctorDashboard() {
         </div>
       </div>
 
+      {/* Location Filter Bar */}
+      {!loading && queue.length > 0 && (
+        <div className="mb-6 flex flex-wrap gap-2 items-center bg-white p-3 rounded-2xl border border-slate-100 shadow-sm">
+          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider px-2 flex items-center gap-1.5">
+            <Filter size={12} className="text-slate-400" />
+            Filter by Location:
+          </span>
+          <button
+            onClick={() => setFilterLocation('all')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-200 ${
+              filterLocation === 'all'
+                ? 'bg-peach-500 text-white shadow-md shadow-peach-500/20'
+                : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-transparent hover:border-slate-200'
+            }`}
+          >
+            All Locations ({queue.length})
+          </button>
+
+          <button
+            onClick={() => setFilterLocation('chennai')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-200 flex items-center gap-1.5 ${
+              filterLocation === 'chennai'
+                ? 'bg-peach-500 text-white shadow-md shadow-peach-500/20'
+                : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-transparent hover:border-slate-200'
+            }`}
+          >
+            <MapPin size={12} />
+            Chennai ({chennaiCount})
+          </button>
+
+          {hasDoctorCity && !isDoctorCityChennai && (
+            <button
+              onClick={() => setFilterLocation('my_city')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-200 flex items-center gap-1.5 ${
+                filterLocation === 'my_city'
+                  ? 'bg-peach-500 text-white shadow-md shadow-peach-500/20'
+                  : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-transparent hover:border-slate-200'
+              }`}
+            >
+              <MapPin size={12} />
+              My City: {doctorCity} ({myCityCount})
+            </button>
+          )}
+        </div>
+      )}
+
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 size={32} className="animate-spin text-teal-500" />
@@ -75,9 +143,15 @@ export default function DoctorDashboard() {
           <p className="text-lg font-medium text-slate-400">No escalated cases</p>
           <p className="text-sm text-slate-300 mt-1">New cases will appear here in real time</p>
         </div>
+      ) : filteredQueue.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center">
+          <MapPin size={48} className="text-slate-200 mx-auto mb-4" />
+          <p className="text-lg font-medium text-slate-400">No escalated cases in this location</p>
+          <p className="text-sm text-slate-300 mt-1">Try switching back to "All Locations"</p>
+        </div>
       ) : (
         <div className="space-y-3">
-          {queue.map((item, i) => (
+          {filteredQueue.map((item, i) => (
             <button
               key={item.conversation_id}
               onClick={() => navigate(`/doctor/case/${item.conversation_id}`)}
@@ -91,10 +165,26 @@ export default function DoctorDashboard() {
                       {item.patient_name.charAt(0)}
                     </div>
                     <div>
-                      <p className="font-semibold text-navy-900">{item.patient_name}</p>
-                      <p className="text-xs text-slate-400 flex items-center gap-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-navy-900">{item.patient_name}</p>
+                        {item.last_risk_score !== undefined && item.last_risk_score !== null && (
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                            item.last_risk_band === 'high' ? 'bg-coral-500/10 text-coral-500 border border-coral-500/20' :
+                            item.last_risk_band === 'moderate' ? 'bg-amber-50 text-amber-600 border border-amber-200' :
+                            'bg-sage-50 text-sage-600 border border-sage-200'
+                          }`}>
+                            Risk: {item.last_risk_score}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
                         <Clock size={10} />
                         {new Date(item.created_at).toLocaleString()}
+                        {item.patient_city && (
+                          <span className="flex items-center gap-0.5 text-slate-400 ml-1.5 font-medium">
+                            • <MapPin size={10} className="text-peach-500 inline" /> {item.patient_city}
+                          </span>
+                        )}
                       </p>
                     </div>
                   </div>

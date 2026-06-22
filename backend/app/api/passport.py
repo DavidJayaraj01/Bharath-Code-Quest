@@ -18,6 +18,9 @@ router = APIRouter(prefix="/api/passport", tags=["passport"])
 
 @router.get("/profile", response_model=PatientOut)
 def get_profile(db: Session = Depends(get_db), user: User = Depends(require_role("patient"))):
+    if user.email == "priya.sharma@demo.vitalbridge.in":
+        from app.seed_passport import seed_patient_passport
+        seed_patient_passport(db)
     patient = db.query(Patient).filter(Patient.user_id == user.id).first()
     if not patient:
         raise HTTPException(status_code=404, detail="Patient profile not found")
@@ -49,6 +52,9 @@ def get_vitals(
     db: Session = Depends(get_db),
     user: User = Depends(require_role("patient")),
 ):
+    if user.email == "priya.sharma@demo.vitalbridge.in":
+        from app.seed_passport import seed_patient_passport
+        seed_patient_passport(db)
     patient = db.query(Patient).filter(Patient.user_id == user.id).first()
     if not patient:
         raise HTTPException(status_code=404, detail="Patient profile not found")
@@ -59,8 +65,10 @@ def get_vitals(
     return q.order_by(VitalReading.recorded_at.desc()).limit(limit).all()
 
 
+from app.services.risk_score_service import update_and_broadcast_risk_score
+
 @router.post("/vitals", response_model=VitalReadingOut, status_code=201)
-def log_vital(
+async def log_vital(
     reading: VitalReadingCreate,
     db: Session = Depends(get_db),
     user: User = Depends(require_role("patient")),
@@ -79,6 +87,9 @@ def log_vital(
     db.add(vital)
     db.commit()
     db.refresh(vital)
+    
+    await update_and_broadcast_risk_score(patient.id, db)
+    
     return vital
 
 
@@ -188,15 +199,49 @@ def get_nearby_hospitals(
     # Query all doctors in that city
     doctors = db.query(Doctor).filter(Doctor.city.like(city)).all()
     
-    hospitals_map = {}
+    # Standard seeded hospitals for Chennai
+    if city.lower() == "chennai":
+        hospitals_map = {
+            "Government Stanley Hospital": {
+                "hospital_name": "Government Stanley Hospital",
+                "city": "Chennai",
+                "state": "Tamil Nadu",
+                "distance": 4.2,
+                "specialties": ["Emergency", "General"],
+                "open_24h": True,
+                "address": "Stanley Medical College, Chennai",
+                "phone": "+91-44-2528-1351",
+                "doctors": []
+            },
+            "ESI Hospital Ayanavaram": {
+                "hospital_name": "ESI Hospital Ayanavaram",
+                "city": "Chennai",
+                "state": "Tamil Nadu",
+                "distance": 6.8,
+                "specialties": ["General", "Maternity"],
+                "open_24h": False,
+                "address": "Ayanavaram, Chennai",
+                "phone": "+91-44-2674-1234",
+                "doctors": []
+            }
+        }
+    else:
+        hospitals_map = {}
+
     for doc in doctors:
         doc_user = db.query(User).filter(User.id == doc.user_id).first()
-        hosp_name = doc.hospital or "General Hospital"
+        hosp_name = doc.hospital or "Government Stanley Hospital"
+        # If it's a new hospital not in our map, add it
         if hosp_name not in hospitals_map:
             hospitals_map[hosp_name] = {
                 "hospital_name": hosp_name,
                 "city": doc.city,
                 "state": doc.state,
+                "distance": 5.0,
+                "specialties": ["General"],
+                "open_24h": True,
+                "address": f"{doc.city} General Hospital",
+                "phone": "+91-44-1111-2222",
                 "doctors": []
             }
         hospitals_map[hosp_name]["doctors"].append({
@@ -274,6 +319,7 @@ async def appoint_doctor_hospital(
                 "patient_name": user.full_name,
                 "chief_complaint": conv.chief_complaint or "Direct Appointment",
                 "severity": conv.severity or "medium",
+                "patient_city": patient.city if patient else (conv.region if conv else None),
             })
         except Exception as e:
             print(f"[WS] Broadcast error: {e}")
@@ -304,3 +350,41 @@ async def appoint_doctor_hospital(
         "success": True,
         "message": f"Appointment request submitted successfully to {doc_user.full_name if doc_user else 'doctor'} at {doctor.hospital or 'hospital'}."
     }
+
+
+hospitals_router = APIRouter(prefix="/api/hospitals", tags=["hospitals"])
+
+@hospitals_router.get("")
+def get_hospitals(district: str = "Chennai", limit: int = 10):
+    # Seed 2 hospitals for Chennai
+    hospitals = [
+        {
+            "name": "Government Stanley Hospital",
+            "distance": 4.2,
+            "specialties": ["Emergency", "General"],
+            "open_24h": True,
+            "address": "Stanley Medical College, Chennai",
+            "phone": "+91-44-2528-1351"
+        },
+        {
+            "name": "ESI Hospital Ayanavaram",
+            "distance": 6.8,
+            "specialties": ["General", "Maternity"],
+            "open_24h": False,
+            "address": "Ayanavaram, Chennai",
+            "phone": "+91-44-2674-1234"
+        }
+    ]
+    if district.lower() != "chennai":
+        return [
+            {
+                "name": f"{district} District Hospital",
+                "distance": 3.5,
+                "specialties": ["Emergency", "General"],
+                "open_24h": True,
+                "address": f"Main Road, {district}",
+                "phone": "+91-11-2222-3333"
+            }
+        ]
+    return hospitals[:limit]
+

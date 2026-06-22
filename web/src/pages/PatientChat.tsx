@@ -2,8 +2,18 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import api from '../api/client';
-import { Send, Plus, Loader2, AlertTriangle, CheckCircle2, MessageSquare, ArrowLeft, Smartphone } from 'lucide-react';
+import { Send, Plus, Loader2, AlertTriangle, CheckCircle2, MessageSquare, ArrowLeft, Smartphone, Mic, MicOff } from 'lucide-react';
 import type { ConversationSummary, ChatMessage, SeverityLevel } from '../types';
+
+// ── Web Speech API type augmentation ──
+interface SpeechRecognitionEvent extends Event {
+  results: SpeechRecognitionResultList;
+  resultIndex: number;
+}
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+  message?: string;
+}
 
 const severityConfig: Record<string, { color: string; bg: string; label: string }> = {
   pending: { color: 'text-peach-700', bg: 'bg-peach-100', label: 'Pending' },
@@ -12,10 +22,8 @@ const severityConfig: Record<string, { color: string; bg: string; label: string 
   high: { color: 'text-destructive', bg: 'bg-destructive/10', label: 'High' },
 };
 
-/** Extract a short keyword-based title from chief_complaint for patient view */
 function extractKeywords(complaint: string | undefined | null): string {
   if (!complaint) return 'Symptom Check';
-  // Take first 3 meaningful words as a summary title
   const stopWords = new Set(['i', 'am', 'a', 'the', 'is', 'my', 'me', 'have', 'having', 'been', 'was', 'with', 'and', 'or', 'for', 'to', 'in', 'of', 'it', 'has', 'had', 'are', 'be', 'do', 'does', 'did', 'not', 'no', 'on', 'at', 'but', 'so', 'from', 'that', 'this', 'an', 'can', 'very', 'too', 'just', 'also', 'some', 'really', 'feeling', 'feel', 'lot', 'since', 'yesterday', 'today', 'get', 'getting']);
   const words = complaint
     .replace(/[^a-zA-Z\s]/g, '')
@@ -24,6 +32,115 @@ function extractKeywords(complaint: string | undefined | null): string {
     .slice(0, 3)
     .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
   return words.length > 0 ? words.join(', ') : 'Health Query';
+}
+
+// ── Voice Input Hook ──
+function useVoiceInput(onTranscript: (text: string) => void) {
+  const [isListening, setIsListening] = useState(false);
+  const [voiceLang, setVoiceLang] = useState<'hi-IN' | 'en-IN'>('hi-IN');
+  const [voiceSupported, setVoiceSupported] = useState(true);
+  const [voiceToast, setVoiceToast] = useState<string | null>(null);
+  const recognitionRef = useRef<any>(null);
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setVoiceSupported(false);
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = voiceLang;
+    recognition.maxAlternatives = 1;
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      // Reset silence timer on any result
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = setTimeout(() => { stopListening(); }, 5000);
+
+      let finalTranscript = '';
+      let interimTranscript = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript;
+        } else {
+          interimTranscript += transcript;
+        }
+      }
+      // Pass the best available transcript
+      const text = finalTranscript || interimTranscript;
+      if (text) onTranscript(text);
+    };
+
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      if (event.error === 'no-speech') {
+        showToast('No speech detected. Try again.');
+      } else if (event.error === 'not-allowed') {
+        showToast('Microphone access denied.');
+      } else {
+        showToast(`Voice error: ${event.error}`);
+      }
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+      if (silenceTimerRef.current) { clearTimeout(silenceTimerRef.current); silenceTimerRef.current = null; }
+    };
+
+    recognitionRef.current = recognition;
+
+    return () => {
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      try { recognition.abort(); } catch {}
+    };
+  }, [voiceLang]);
+
+  const showToast = (msg: string) => {
+    setVoiceToast(msg);
+    setTimeout(() => setVoiceToast(null), 3000);
+  };
+
+  const startListening = () => {
+    if (!recognitionRef.current) return;
+    try {
+      recognitionRef.current.lang = voiceLang;
+      recognitionRef.current.start();
+      setIsListening(true);
+      // Auto-stop after 5 seconds of silence
+      silenceTimerRef.current = setTimeout(() => {
+        stopListening();
+        showToast('No speech detected');
+      }, 5000);
+    } catch (e: any) {
+      if (e.message?.includes('already started')) {
+        stopListening();
+      }
+    }
+  };
+
+  const stopListening = () => {
+    if (!recognitionRef.current) return;
+    try { recognitionRef.current.stop(); } catch {}
+    setIsListening(false);
+    if (silenceTimerRef.current) { clearTimeout(silenceTimerRef.current); silenceTimerRef.current = null; }
+  };
+
+  const toggleListening = () => {
+    if (isListening) stopListening();
+    else startListening();
+  };
+
+  const toggleLang = () => {
+    const newLang = voiceLang === 'hi-IN' ? 'en-IN' : 'hi-IN';
+    setVoiceLang(newLang);
+    if (isListening) { stopListening(); }
+  };
+
+  return { isListening, voiceLang, voiceSupported, voiceToast, toggleListening, toggleLang, stopListening };
 }
 
 export default function PatientChat() {
@@ -46,6 +163,13 @@ export default function PatientChat() {
 
   const isDoctor = user?.role === 'doctor';
 
+  // Voice input integration
+  const handleVoiceTranscript = useCallback((text: string) => {
+    setInput(text);
+  }, []);
+
+  const voice = useVoiceInput(handleVoiceTranscript);
+
   const sendReport = async () => {
     if (!conversationId || reportSending) return;
     setReportSending(true);
@@ -66,7 +190,6 @@ export default function PatientChat() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
-  // Load conversation list
   useEffect(() => {
     api.get('/triage/conversations').then(r => {
       setConversations(r.data);
@@ -74,7 +197,6 @@ export default function PatientChat() {
     }).catch(() => setLoadingConvs(false));
   }, []);
 
-  // Load messages when conversation changes
   useEffect(() => {
     if (!conversationId) {
       setMessages([]);
@@ -89,10 +211,8 @@ export default function PatientChat() {
     });
   }, [conversationId, scrollToBottom]);
 
-  // WebSocket connection
   useEffect(() => {
     if (!conversationId || !token) return;
-
     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
     const host = window.location.hostname === 'localhost' ? 'localhost:8000' : window.location.host;
     const wsUrl = `${protocol}://${host}/api/triage/ws/${conversationId}?token=${token}`;
@@ -122,7 +242,6 @@ export default function PatientChat() {
           if (data.severity) setSeverity(data.severity);
           if (data.status) setStatus(data.status);
           setTimeout(scrollToBottom, 50);
-          // Update conversation list with the new chief_complaint if available
           if (data.message) {
             setConversations(prev => prev.map(c =>
               c.id === conversationId && !c.chief_complaint
@@ -134,13 +253,8 @@ export default function PatientChat() {
       }
     };
 
-    ws.onerror = (e) => {
-      console.error('WebSocket Error:', e);
-    };
-    ws.onclose = (e) => {
-      console.log('WebSocket Closed:', e.code, e.reason);
-    };
-
+    ws.onerror = (e) => { console.error('WebSocket Error:', e); };
+    ws.onclose = (e) => { console.log('WebSocket Closed:', e.code, e.reason); };
     return () => { ws.close(); };
   }, [conversationId, token, scrollToBottom]);
 
@@ -157,6 +271,8 @@ export default function PatientChat() {
   const sendMessage = () => {
     const text = input.trim();
     if (!text || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+    // Stop listening if recording
+    if (voice.isListening) voice.stopListening();
     wsRef.current.send(JSON.stringify({ content: text }));
     setInput('');
     inputRef.current?.focus();
@@ -169,15 +285,12 @@ export default function PatientChat() {
     }
   };
 
-  /** Get display title for a conversation in the sidebar */
   const getConversationTitle = (conv: ConversationSummary): string => {
-    if (isDoctor) {
-      // For doctors: show patient name (we'd need it from the API, fallback to complaint)
-      return conv.chief_complaint || 'Patient Case';
-    }
-    // For patients: show keyword summary of the complaint
+    if (isDoctor) return conv.chief_complaint || 'Patient Case';
     return extractKeywords(conv.chief_complaint);
   };
+
+  const isChatDisabled = status === 'resolved' || status === 'closed';
 
   return (
     <div className="flex h-full">
@@ -366,8 +479,60 @@ export default function PatientChat() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input */}
+            {/* Voice toast notification */}
+            {voice.voiceToast && (
+              <div className="px-6">
+                <div className="voice-toast flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium rounded-xl mb-2">
+                  <MicOff size={14} />
+                  {voice.voiceToast}
+                </div>
+              </div>
+            )}
+
+            {/* Input area with voice */}
             <div className="px-6 py-4 bg-white border-t border-slate-200">
+              {/* Language toggle + voice status row */}
+              {voice.voiceSupported && !isChatDisabled && (
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                    <button
+                      onClick={() => { if (voice.voiceLang !== 'en-IN') voice.toggleLang(); }}
+                      className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                        voice.voiceLang === 'en-IN'
+                          ? 'bg-[#0D9488] text-white shadow-sm'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      🇬🇧 English
+                    </button>
+                    <button
+                      onClick={() => { if (voice.voiceLang !== 'hi-IN') voice.toggleLang(); }}
+                      className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                        voice.voiceLang === 'hi-IN'
+                          ? 'bg-[#0D9488] text-white shadow-sm'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      🇮🇳 हिंदी
+                    </button>
+                  </div>
+                  {voice.isListening && (
+                    <span className="text-[11px] text-coral-500 font-semibold flex items-center gap-1.5 ml-auto animate-pulse">
+                      <span className="w-2 h-2 rounded-full bg-coral-500 inline-block" />
+                      Listening...
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Not supported message */}
+              {!voice.voiceSupported && (
+                <div className="text-[11px] text-slate-400 mb-2 flex items-center gap-1">
+                  <MicOff size={12} />
+                  Voice input not supported in this browser. Try Chrome or Edge.
+                </div>
+              )}
+
               <div className="flex items-center gap-3">
                 <input
                   ref={inputRef}
@@ -376,14 +541,46 @@ export default function PatientChat() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Describe your symptoms..."
-                  className="flex-1 px-4 py-3 bg-slate-50 rounded-xl border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all text-sm"
-                  disabled={status === 'resolved' || status === 'closed'}
+                  placeholder={voice.isListening ? 'Listening... speak now' : 'Describe your symptoms...'}
+                  className={`flex-1 px-4 py-3 bg-slate-50 rounded-xl border focus:ring-2 focus:ring-teal-500/20 outline-none transition-all text-sm ${
+                    voice.isListening
+                      ? 'border-coral-400 bg-coral-50/30 focus:border-coral-400'
+                      : 'border-slate-200 focus:border-teal-500'
+                  }`}
+                  disabled={isChatDisabled}
                 />
+
+                {/* Mic button */}
+                {voice.voiceSupported && (
+                  <button
+                    id="voice-mic-btn"
+                    onClick={voice.toggleListening}
+                    disabled={isChatDisabled}
+                    className={`voice-mic-btn p-3 rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-sm ${
+                      voice.isListening
+                        ? 'bg-coral-500 hover:bg-coral-400 text-white shadow-coral-500/25'
+                        : 'bg-teal-500 hover:bg-teal-400 text-white shadow-teal-500/25'
+                    }`}
+                    title={voice.isListening ? 'Stop recording' : 'Start voice input'}
+                  >
+                    {voice.isListening && <span className="voice-pulse-ring" />}
+                    {voice.isListening ? (
+                      <span className="flex items-center justify-center w-[18px] h-[18px]">
+                        <span className="voice-waveform-bar" />
+                        <span className="voice-waveform-bar" />
+                        <span className="voice-waveform-bar" />
+                      </span>
+                    ) : (
+                      <Mic size={18} />
+                    )}
+                  </button>
+                )}
+
+                {/* Send button */}
                 <button
                   id="send-btn"
                   onClick={sendMessage}
-                  disabled={!input.trim() || status === 'resolved' || status === 'closed'}
+                  disabled={!input.trim() || isChatDisabled}
                   className="p-3 bg-teal-500 hover:bg-teal-400 text-white rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-sm"
                 >
                   <Send size={18} />

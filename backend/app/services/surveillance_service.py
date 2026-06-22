@@ -123,6 +123,39 @@ async def process_surveillance_alert(conv_id: str, db: Session):
             report.alert_level = alert_level
         report.period_end = datetime.now(timezone.utc)
         
+    # Calculate probability
+    alert_mult = {"critical": 1.0, "warning": 0.8, "watch": 0.5, "normal": 0.2}.get(report.alert_level, 0.2)
+    prob = 0.4 * min(1.0, report.case_count / 15.0) + 0.4 * report.risk_score + 0.2 * alert_mult
+    prob = round(max(0.0, min(1.0, prob)), 4)
+    
+    # Store hourly OutbreakSnapshot
+    from app.models.models import OutbreakSnapshot
+    now = datetime.now(timezone.utc)
+    current_hour = now.replace(minute=0, second=0, microsecond=0)
+    
+    snapshot = db.query(OutbreakSnapshot).filter(
+        OutbreakSnapshot.region == report.region,
+        OutbreakSnapshot.symptom_category == report.symptom_category,
+        OutbreakSnapshot.timestamp == current_hour
+    ).first()
+    
+    if not snapshot:
+        snapshot = OutbreakSnapshot(
+            region=report.region,
+            latitude=report.latitude,
+            longitude=report.longitude,
+            symptom_category=report.symptom_category,
+            probability=prob,
+            case_count=report.case_count,
+            timestamp=current_hour
+        )
+        db.add(snapshot)
+    else:
+        snapshot.probability = prob
+        snapshot.case_count = report.case_count
+        snapshot.latitude = report.latitude
+        snapshot.longitude = report.longitude
+        
     db.commit()
     
     # Broadcast to surveillance channel via WebSockets
@@ -133,4 +166,5 @@ async def process_surveillance_alert(conv_id: str, db: Session):
         "case_count": report.case_count,
         "risk_score": report.risk_score,
         "alert_level": report.alert_level,
+        "outbreak_probability": prob,
     })

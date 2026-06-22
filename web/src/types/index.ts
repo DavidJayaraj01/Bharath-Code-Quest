@@ -14,6 +14,7 @@ export interface User {
   role: UserRole;
   is_active: boolean;
   created_at: string;
+  city?: string;
 }
 
 export interface TokenResponse {
@@ -33,6 +34,8 @@ export interface Patient {
   blood_group?: string;
   allergies: string[];
   chronic_conditions: string[];
+  last_risk_score?: number;
+  last_risk_band?: 'low' | 'moderate' | 'high';
 }
 
 export interface Doctor {
@@ -72,6 +75,7 @@ export interface ConversationSummary {
   severity: SeverityLevel;
   status: ConversationStatus;
   chief_complaint?: string;
+  ai_summary?: string;
   created_at: string;
 }
 
@@ -140,6 +144,9 @@ export interface DoctorQueueItem {
   severity: SeverityLevel;
   created_at: string;
   ai_summary?: string;
+  last_risk_score?: number;
+  last_risk_band?: 'low' | 'moderate' | 'high';
+  patient_city?: string;
 }
 
 export interface DispenserDevice {
